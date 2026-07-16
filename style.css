@@ -1,0 +1,2208 @@
+:root {
+  /* =========================================================================
+   * 全站调参面板
+   * =========================================================================
+   * 后期调整视觉时，优先修改这里。变量被下方多个场景共同引用。
+   */
+
+  /* ---------- 全站字体 ---------- */
+  --font-main: "Microsoft YaHei", "PingFang SC", "Noto Sans SC", SimSun,
+    sans-serif;
+  --font-romantic: "STKaiti", "KaiTi", serif;
+  --base-font-size: 14px;
+
+  /* ---------- 全站暖色系 ---------- */
+  color-scheme: light;
+  --paper: #fffbee;
+  --ink: #231f20;
+  --muted: #666;
+  --love: #be1a25;
+  --peach: #f3b7a8;
+  --rose: #c65d62;
+  --cream: #fff4df;
+  --butter: #e8b84f;
+  --cocoa: #5a3f43;
+
+  /* ---------- 开场追逐爱心 ---------- */
+  --opening-title-size: clamp(34px, 6vw, 76px);
+  --opening-description-size: clamp(14px, 1.7vw, 20px);
+  --opening-notice-size: clamp(13px, 1.45vw, 17px);
+  --opening-heart-size: clamp(82px, 10vw, 126px);
+  /* 此值会被 birthday-content.js / opening.transitionMs 自动覆盖。 */
+  --opening-heart-transition: 720ms;
+  /* 此值会被 birthday-content.js / opening.exitDurationMs 自动覆盖。 */
+  --opening-exit-duration: 760ms;
+
+  /* ---------- 爱心树情书 ---------- */
+  --story-font-size: clamp(8px, 1.46vw, 16px);
+  --story-line-height: 2;
+
+  /* ---------- 米老鼠气泡 ---------- */
+  --speech-font-size: clamp(14px, 1.65vw, 21px);
+  --speech-line-height: 1.55;
+
+  /* ---------- 照片流：改宽度可让文字更容易保持一行 ---------- */
+  --photo-card-width: clamp(228px, 25vw, 330px);
+  --photo-card-aspect: 4 / 5;
+  --photo-card-gap: clamp(22px, 3vw, 44px);
+  --photo-caption-size: clamp(13px, 1.28vw, 17px);
+  --photo-caption-line-height: 1.45;
+
+  /* ---------- 单张照片放大卡片 ---------- */
+  --lightbox-card-width: 720px;
+  --lightbox-caption-size: clamp(16px, 2.2vw, 23px);
+
+  /* ---------- 礼物中的生日卡片 ---------- */
+  --birthday-card-width: 530px;
+  --birthday-card-min-height: 430px;
+  --birthday-card-padding-top: clamp(102px, 12vw, 122px);
+  --birthday-card-padding-x: clamp(32px, 5vw, 58px);
+  --birthday-card-padding-bottom: clamp(32px, 5vw, 52px);
+  --birthday-title-size: clamp(25px, 4vw, 42px);
+  --birthday-body-size: clamp(14px, 1.75vw, 18px);
+  --birthday-body-line-height: 1.9;
+  --birthday-signature-size: 17px;
+}
+
+/* 所有元素的宽高都包含 padding 和 border，方便精确调卡片尺寸。 */
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-width: 100%;
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-main);
+  font-size: var(--base-font-size);
+}
+
+/* 去掉移动端点击按钮和 Canvas 时出现的系统灰色高亮。 */
+button,
+canvas {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ===========================================================================
+ * 0. 开场追逐爱心
+ * ======================================================================== */
+
+/* 开场存在时锁住页面滚动，避免爱心移动区域随页面偏移。 */
+body[data-phase="opening"],
+body[data-phase="opening-caught"] {
+  overflow: hidden;
+}
+
+.opening-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  grid-template-rows: auto minmax(240px, 1fr) auto auto;
+  min-height: 100svh;
+  overflow: hidden;
+  padding:
+    max(42px, env(safe-area-inset-top))
+    clamp(18px, 4vw, 60px)
+    max(26px, env(safe-area-inset-bottom));
+  color: #68484d;
+  background:
+    radial-gradient(circle at 18% 18%, rgba(255, 241, 196, 0.9), transparent 27%),
+    radial-gradient(circle at 82% 76%, rgba(224, 142, 135, 0.32), transparent 34%),
+    linear-gradient(145deg, #fff9ec, #f9e4d4 54%, #efc7bd);
+  isolation: isolate;
+}
+
+/* 柔光噪点层，让开场背景不显得过于平。 */
+.opening-gate::before {
+  content: "";
+  position: absolute;
+  inset: -20%;
+  z-index: -2;
+  background:
+    repeating-radial-gradient(
+      circle at 25% 30%,
+      rgba(255, 255, 255, 0.18) 0 1px,
+      transparent 1px 16px
+    );
+  opacity: 0.48;
+  animation: opening-light-drift 12s ease-in-out infinite alternate;
+}
+
+/* 开场成功后禁止继续点击，并播放整个遮罩淡出动画。 */
+.opening-gate.is-caught {
+  pointer-events: none;
+  animation: opening-gate-exit var(--opening-exit-duration) ease forwards;
+}
+
+.opening-gate.is-hidden {
+  display: none;
+}
+
+.opening-copy {
+  position: relative;
+  z-index: 2;
+  width: min(780px, 100%);
+  margin: 0 auto;
+  text-align: center;
+}
+
+.opening-eyebrow {
+  margin: 0 0 13px;
+  color: #b46c6d;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.34em;
+}
+
+.opening-copy h1 {
+  margin: 0;
+  color: #714b51;
+  font-family: var(--font-romantic);
+  font-size: var(--opening-title-size);
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  line-height: 1.16;
+  text-wrap: balance;
+}
+
+.opening-copy > p:last-child {
+  margin: 14px 0 0;
+  color: #9a7377;
+  font-family: var(--font-romantic);
+  font-size: var(--opening-description-size);
+  letter-spacing: 0.05em;
+}
+
+/* 爱心移动的专属安全区域，不覆盖标题和耳机提示。 */
+.catch-arena {
+  position: relative;
+  align-self: stretch;
+  width: min(1120px, 100%);
+  min-height: 250px;
+  margin: clamp(8px, 2vh, 24px) auto;
+}
+
+.catch-arena::before {
+  content: "";
+  position: absolute;
+  inset: 8% 5%;
+  border: 1px dashed rgba(183, 102, 104, 0.16);
+  border-radius: 46% 54% 44% 56% / 55% 42% 58% 45%;
+  animation: opening-orbit 18s linear infinite;
+}
+
+/* 真正可以点击的移动爱心按钮。位置由 script.js 写入 left / top。 */
+.catch-heart {
+  position: absolute;
+  left: calc(50% - var(--opening-heart-size) / 2);
+  top: calc(50% - var(--opening-heart-size) / 2);
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  width: var(--opening-heart-size);
+  aspect-ratio: 1;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  outline: none;
+  background: transparent;
+  cursor: pointer;
+  transform: rotate(var(--catch-tilt, -4deg));
+  transition:
+    left var(--opening-heart-transition) cubic-bezier(0.22, 0.75, 0.3, 1),
+    top var(--opening-heart-transition) cubic-bezier(0.22, 0.75, 0.3, 1),
+    transform 320ms ease,
+    filter 320ms ease;
+  touch-action: manipulation;
+}
+
+.catch-heart:hover,
+.catch-heart:focus-visible {
+  filter: brightness(1.06) drop-shadow(0 18px 22px rgba(173, 55, 65, 0.32));
+}
+
+.catch-heart:focus-visible {
+  outline: 2px dashed rgba(165, 72, 79, 0.74);
+  outline-offset: 8px;
+}
+
+.catch-heart-shape {
+  color: #c91f30;
+  font-family: Georgia, serif;
+  font-size: calc(var(--opening-heart-size) * 0.82);
+  line-height: 0.8;
+  filter:
+    drop-shadow(0 17px 18px rgba(145, 50, 58, 0.2))
+    drop-shadow(0 0 18px rgba(255, 158, 147, 0.3));
+  animation: catch-heartbeat 1.15s ease-in-out infinite;
+}
+
+.catch-heart-label {
+  position: absolute;
+  left: 50%;
+  top: 76%;
+  padding: 4px 9px;
+  border: 1px solid rgba(188, 77, 84, 0.2);
+  border-radius: 999px;
+  background: rgba(255, 251, 238, 0.88);
+  box-shadow: 0 8px 18px rgba(115, 65, 69, 0.12);
+  color: #a64951;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  white-space: nowrap;
+  transform: translateX(-50%);
+}
+
+/* 成功点击时把爱心拉向画面中央并放大，作为进入下一幕的视觉确认。 */
+.opening-gate.is-caught .catch-heart {
+  left: 50% !important;
+  top: 50% !important;
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(2.4) rotate(0);
+  transition:
+    left 420ms cubic-bezier(0.16, 1, 0.3, 1),
+    top 420ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 620ms cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 280ms 360ms ease;
+}
+
+/* 爱心经过旧位置后留下的短暂轨迹容器。 */
+.catch-trail {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.catch-trail > span {
+  position: absolute;
+  color: rgba(205, 77, 85, 0.45);
+  font-size: var(--trail-size);
+  transform: translate(-50%, -50%);
+  animation: catch-trail-fade 1.4s ease-out forwards;
+}
+
+.opening-notice,
+.opening-tip {
+  position: relative;
+  z-index: 2;
+  text-align: center;
+}
+
+.opening-notice {
+  justify-self: center;
+  margin: 0;
+  padding: 10px 17px;
+  border: 1px solid rgba(170, 92, 96, 0.16);
+  border-radius: 999px;
+  background: rgba(255, 250, 238, 0.64);
+  box-shadow: 0 12px 30px rgba(112, 67, 70, 0.1);
+  color: #8d6267;
+  font-size: var(--opening-notice-size);
+  letter-spacing: 0.08em;
+  backdrop-filter: blur(8px);
+}
+
+.headphone-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  margin-right: 7px;
+  border-radius: 50%;
+  background: rgba(199, 93, 98, 0.12);
+  color: #b44f58;
+}
+
+.opening-tip {
+  margin: 12px 0 0;
+  color: rgba(116, 78, 82, 0.55);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+}
+
+/* 背景中缓慢漂浮的装饰爱心。 */
+.opening-ambient {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+
+.opening-ambient span {
+  position: absolute;
+  color: rgba(206, 112, 113, 0.12);
+  font: 70px/1 Georgia, serif;
+  animation: opening-ambient-float 7s ease-in-out infinite;
+}
+
+.opening-ambient span:nth-child(1) {
+  left: 7%;
+  top: 16%;
+}
+
+.opening-ambient span:nth-child(2) {
+  right: 8%;
+  top: 20%;
+  font-size: 42px;
+  animation-delay: -2s;
+}
+
+.opening-ambient span:nth-child(3) {
+  left: 12%;
+  bottom: 12%;
+  font-size: 36px;
+  animation-delay: -4s;
+}
+
+.opening-ambient span:nth-child(4) {
+  right: 13%;
+  bottom: 14%;
+  font-size: 88px;
+  animation-delay: -5.5s;
+}
+
+/* ===========================================================================
+ * 1. 爱心树基础布局
+ * ======================================================================== */
+
+#main {
+  width: 100%;
+}
+
+#stage {
+  position: relative;
+  width: min(1100px, 100vw);
+  aspect-ratio: 1100 / 680;
+  margin: 10px auto 0;
+  overflow: hidden;
+  background: var(--paper);
+}
+
+#loveCanvas {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  height: 100%;
+  outline: none;
+  touch-action: manipulation;
+}
+
+#loveCanvas.is-clickable {
+  cursor: pointer;
+}
+
+#loveCanvas:focus-visible {
+  outline: 2px dashed rgba(190, 26, 37, 0.72);
+  outline-offset: -8px;
+}
+
+.story-panel {
+  position: absolute;
+  top: 11.76%;
+  left: 5.45%;
+  z-index: 2;
+  width: 36.36%;
+  height: 62.5%;
+  pointer-events: none;
+  visibility: hidden;
+  opacity: 0;
+  font-size: var(--story-font-size);
+  line-height: var(--story-line-height);
+  transition: opacity 500ms ease;
+}
+
+.story-panel.is-visible {
+  visibility: visible;
+  opacity: 1;
+}
+
+#storyText {
+  white-space: pre-wrap;
+}
+
+.type-cursor {
+  display: inline-block;
+  width: 0.55em;
+  color: var(--love);
+  animation: blink 800ms steps(1, end) infinite;
+}
+
+.clock-box {
+  position: absolute;
+  top: 80.88%;
+  left: 5.45%;
+  z-index: 2;
+  pointer-events: none;
+  visibility: hidden;
+  opacity: 0;
+  font-size: clamp(12px, 2.55vw, 28px);
+  transition: opacity 500ms ease;
+}
+
+.clock-box.is-visible {
+  visibility: visible;
+  opacity: 1;
+}
+
+.clock-heading > span {
+  color: var(--muted);
+}
+
+#clock {
+  margin-left: 7%;
+  white-space: nowrap;
+  font-size: clamp(8px, 1.45vw, 16px);
+}
+
+#clock .digit {
+  font-size: clamp(22px, 5.82vw, 64px);
+  font-variant-numeric: tabular-nums;
+}
+
+.music-toggle {
+  position: fixed;
+  top: 14px;
+  right: 16px;
+  z-index: 10;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 6px 11px;
+  border: 1px solid rgba(190, 26, 37, 0.22);
+  border-radius: 999px;
+  background: rgba(255, 251, 238, 0.86);
+  color: #8f1821;
+  font: inherit;
+  cursor: pointer;
+  opacity: 0.72;
+  backdrop-filter: blur(6px);
+  transition:
+    opacity 180ms ease,
+    border-color 180ms ease,
+    transform 180ms ease;
+}
+
+.music-toggle:hover,
+.music-toggle:focus-visible,
+.music-toggle[aria-pressed="true"] {
+  border-color: rgba(190, 26, 37, 0.55);
+  opacity: 1;
+}
+
+.music-toggle:active {
+  transform: scale(0.96);
+}
+
+.music-toggle[aria-pressed="true"] > span:first-child {
+  animation: music-pulse 1.2s ease-in-out infinite;
+}
+
+.sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+.no-script {
+  margin: 60px auto;
+  text-align: center;
+}
+
+/* ===========================================================================
+ * 基础与开场关键帧
+ * ======================================================================== */
+
+@keyframes catch-heartbeat {
+  0%,
+  100% {
+    transform: scale(0.94);
+  }
+  38% {
+    transform: scale(1.08);
+  }
+  56% {
+    transform: scale(0.98);
+  }
+  72% {
+    transform: scale(1.04);
+  }
+}
+
+@keyframes catch-trail-fade {
+  from {
+    opacity: 0.72;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translate(-50%, -90px) scale(0.3) rotate(22deg);
+  }
+}
+
+@keyframes opening-gate-exit {
+  0%,
+  44% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.035);
+  }
+}
+
+@keyframes opening-light-drift {
+  from {
+    transform: translate(-2%, -1%) rotate(-1deg);
+  }
+  to {
+    transform: translate(2%, 1%) rotate(1deg);
+  }
+}
+
+@keyframes opening-orbit {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes opening-ambient-float {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: translateY(0) rotate(-8deg);
+  }
+  50% {
+    opacity: 0.75;
+    transform: translateY(-18px) rotate(9deg);
+  }
+}
+
+@keyframes blink {
+  0%,
+  48% {
+    opacity: 1;
+  }
+  49%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes music-pulse {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-5deg);
+  }
+  50% {
+    transform: translateY(-2px) rotate(5deg);
+  }
+}
+
+@media (max-width: 700px) {
+  /* 手机开场：缩短上下留白，为爱心保留足够移动空间。 */
+  .opening-gate {
+    grid-template-rows: auto minmax(280px, 1fr) auto auto;
+    padding:
+      max(30px, env(safe-area-inset-top))
+      16px
+      max(20px, env(safe-area-inset-bottom));
+  }
+
+  .opening-eyebrow {
+    font-size: 8px;
+    letter-spacing: 0.25em;
+  }
+
+  .opening-copy > p:last-child {
+    margin-top: 9px;
+  }
+
+  .catch-arena {
+    min-height: 300px;
+    margin-block: 4px;
+  }
+
+  .opening-notice {
+    padding: 8px 13px;
+    letter-spacing: 0.04em;
+  }
+
+  #stage {
+    margin-top: max(52px, env(safe-area-inset-top));
+  }
+
+  .music-toggle {
+    top: max(10px, env(safe-area-inset-top));
+    right: max(10px, env(safe-area-inset-right));
+  }
+
+  .music-label {
+    display: none;
+  }
+
+  .story-panel {
+    font-size: clamp(6px, 2.15vw, 10px);
+    line-height: 1.72;
+  }
+
+  .clock-box {
+    font-size: clamp(9px, 2.8vw, 14px);
+  }
+
+  #clock {
+    font-size: clamp(6px, 1.85vw, 9px);
+  }
+
+  #clock .digit {
+    font-size: clamp(15px, 5.7vw, 29px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* 尊重系统“减少动态效果”：保留互动，但取消持续漂浮和呼吸动画。 */
+  .opening-gate::before,
+  .catch-arena::before,
+  .catch-heart-shape,
+  .opening-ambient span {
+    animation: none;
+  }
+
+  .opening-gate.is-caught .catch-heart {
+    transition-duration: 1ms;
+  }
+
+  .catch-trail {
+    display: none;
+  }
+
+  .music-toggle,
+  .story-panel,
+  .clock-box {
+    transition-duration: 1ms;
+  }
+
+  .type-cursor,
+  .music-toggle[aria-pressed="true"] > span:first-child {
+    animation: none;
+  }
+}
+
+/* ===========================================================================
+ * 2. 爱心树完成后的生日故事扩展
+ * ======================================================================== */
+
+.heart-scene.scene-hidden {
+  display: none;
+}
+
+.mouse-guide {
+  display: flex;
+  align-items: flex-end;
+  gap: clamp(10px, 1.8vw, 24px);
+  pointer-events: none;
+  visibility: hidden;
+  opacity: 0;
+}
+
+.mouse-guide.is-visible {
+  pointer-events: auto;
+  visibility: visible;
+  opacity: 1;
+}
+
+.intro-guide {
+  position: absolute;
+  right: -48%;
+  bottom: 0;
+  z-index: 6;
+  width: min(55%, 580px);
+  transition:
+    right 1.2s cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 500ms ease;
+}
+
+.intro-guide.is-visible {
+  right: 1.6%;
+}
+
+.mouse-mascot {
+  flex: 0 0 auto;
+  width: clamp(92px, 14vw, 168px);
+  overflow: visible;
+  filter: drop-shadow(0 18px 14px rgba(91, 52, 55, 0.2));
+  transform-origin: 50% 100%;
+}
+
+.mascot-image {
+  display: block;
+  height: auto;
+  object-fit: contain;
+  filter: none;
+  opacity: 0;
+  transition: opacity 500ms ease;
+}
+
+.mascot-image.is-ready {
+  opacity: 1;
+}
+
+.mouse-guide.is-visible .mouse-mascot {
+  animation: mouse-arrives 1.2s cubic-bezier(0.16, 1, 0.3, 1) both,
+    mascot-breathe 2.4s 1.2s ease-in-out infinite;
+}
+
+.speech-bubble {
+  position: relative;
+  align-self: center;
+  width: min(285px, 30vw);
+  margin-bottom: 15%;
+  padding: clamp(14px, 2vw, 24px);
+  border: 1px solid rgba(198, 93, 98, 0.18);
+  border-radius: 28px 28px 28px 8px;
+  background: rgba(255, 250, 240, 0.96);
+  box-shadow: 0 20px 55px rgba(95, 53, 58, 0.2);
+  color: var(--cocoa);
+}
+
+.speech-bubble::after {
+  content: "";
+  position: absolute;
+  left: -12px;
+  bottom: 18px;
+  width: 24px;
+  height: 24px;
+  background: inherit;
+  transform: rotate(45deg);
+  border-radius: 5px;
+}
+
+.speech-bubble p {
+  position: relative;
+  z-index: 1;
+  margin: 7px 0 16px;
+  font-family: var(--font-romantic);
+  font-size: var(--speech-font-size);
+  line-height: var(--speech-line-height);
+}
+
+.speech-kicker {
+  position: relative;
+  z-index: 1;
+  color: #b67572;
+  font-size: clamp(9px, 0.9vw, 12px);
+  letter-spacing: 0.08em;
+}
+
+.warm-button,
+.keep-gift,
+.story-next {
+  position: relative;
+  z-index: 2;
+  border: 0;
+  border-radius: 999px;
+  color: #fffaf3;
+  font: inherit;
+  cursor: pointer;
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    opacity 180ms ease;
+}
+
+.warm-button {
+  padding: 10px 18px;
+  background: linear-gradient(135deg, #cb666a, #e49679);
+  box-shadow: 0 10px 25px rgba(198, 93, 98, 0.26);
+}
+
+.warm-button:hover,
+.warm-button:focus-visible,
+.keep-gift:hover,
+.keep-gift:focus-visible,
+.story-next:hover,
+.story-next:focus-visible {
+  transform: translateY(-2px);
+  box-shadow: 0 13px 30px rgba(154, 82, 83, 0.3);
+}
+
+.heart-footprint {
+  position: absolute;
+  right: 17%;
+  bottom: 3%;
+  color: rgba(198, 93, 98, 0.6);
+  opacity: 0;
+  transform: rotate(-16deg);
+}
+
+.intro-guide.is-visible .heart-footprint {
+  animation: footprint-appears 700ms ease forwards;
+}
+
+.footprint-one {
+  right: 24%;
+  animation-delay: 260ms !important;
+}
+
+.footprint-two {
+  right: 17%;
+  bottom: 1%;
+  animation-delay: 460ms !important;
+}
+
+.footprint-three {
+  right: 10%;
+  bottom: 4%;
+  animation-delay: 680ms !important;
+}
+
+/* ===========================================================================
+ * 3. 米老鼠头像全屏转场
+ * ======================================================================== */
+
+.mouse-transition {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  visibility: hidden;
+  opacity: 0;
+  background: linear-gradient(145deg, #f9d1bd, #e9a69e 48%, #d98583);
+  transition:
+    opacity 240ms ease,
+    visibility 240ms ease;
+}
+
+.mouse-transition.is-active {
+  pointer-events: auto;
+  visibility: visible;
+  opacity: 1;
+}
+
+.mouse-transition.is-revealing {
+  opacity: 0;
+  transition-duration: 720ms;
+}
+
+.mouse-transition > p {
+  position: relative;
+  z-index: 3;
+  max-width: 80vw;
+  margin: 0;
+  color: #fff9ef;
+  font-family: var(--font-romantic);
+  font-size: clamp(20px, 3vw, 42px);
+  letter-spacing: 0.08em;
+  text-align: center;
+  text-shadow: 0 4px 25px rgba(86, 45, 50, 0.25);
+  opacity: 0;
+  transform: translateY(18px);
+}
+
+.mouse-transition.is-active > p {
+  animation: transition-copy 800ms 900ms ease forwards;
+}
+
+.mouse-heads,
+.gift-sparkles {
+  position: absolute;
+  inset: 0;
+}
+
+.transition-head {
+  position: absolute;
+  left: var(--left);
+  top: var(--top);
+  width: var(--size);
+  aspect-ratio: 1;
+  color: var(--head-color, #70464b);
+  opacity: 0;
+  transform: translate(-50%, -50%) rotate(var(--rotate)) scale(0);
+}
+
+.transition-head::before,
+.transition-head::after,
+.transition-head > span {
+  content: "";
+  position: absolute;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.transition-head > span {
+  inset: 24% 18% 10%;
+}
+
+.transition-head::before {
+  top: 2%;
+  left: 5%;
+  width: 45%;
+  height: 45%;
+}
+
+.transition-head::after {
+  top: 2%;
+  right: 5%;
+  width: 45%;
+  height: 45%;
+}
+
+.mouse-transition.is-active .transition-head {
+  animation: transition-head-pop 820ms var(--delay)
+    cubic-bezier(0.17, 0.89, 0.32, 1.35) forwards;
+}
+
+/* ===========================================================================
+ * 4. 照片流场景
+ * ======================================================================== */
+
+.photo-scene {
+  position: relative;
+  min-height: 100svh;
+  overflow: hidden;
+  display: none;
+  color: #5b4246;
+  background:
+    radial-gradient(circle at 12% 18%, rgba(255, 244, 210, 0.95), transparent 32%),
+    radial-gradient(circle at 88% 78%, rgba(225, 151, 139, 0.32), transparent 38%),
+    linear-gradient(145deg, #fff7e9, #f7dfcf 52%, #efc6bb);
+}
+
+.photo-scene.is-active {
+  display: block;
+  animation: scene-fade-in 900ms ease both;
+}
+
+.photo-aurora {
+  position: absolute;
+  inset: -25%;
+  background:
+    radial-gradient(circle at 30% 40%, rgba(244, 183, 168, 0.32), transparent 28%),
+    radial-gradient(circle at 70% 30%, rgba(232, 184, 79, 0.18), transparent 24%);
+  filter: blur(30px);
+  animation: aurora-drift 10s ease-in-out infinite alternate;
+}
+
+.photo-content {
+  position: relative;
+  z-index: 1;
+  min-height: 100svh;
+  padding: clamp(54px, 8vh, 92px) 0 72px;
+  transition:
+    filter 850ms ease,
+    transform 850ms ease,
+    opacity 500ms ease;
+}
+
+.photo-content.is-blurred {
+  filter: blur(14px) saturate(0.72);
+  transform: scale(1.035);
+  opacity: 0.72;
+}
+
+.photo-header {
+  width: min(760px, calc(100% - 48px));
+  margin: 0 auto clamp(34px, 6vh, 64px);
+  text-align: center;
+}
+
+.photo-header .eyebrow,
+.card-eyebrow {
+  margin: 0 0 11px;
+  color: #b36f6c;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.28em;
+}
+
+.photo-header h1 {
+  margin: 0;
+  color: #604449;
+  font-family: var(--font-romantic);
+  font-size: clamp(30px, 5vw, 62px);
+  font-weight: 500;
+  letter-spacing: 0.04em;
+}
+
+.mobile-title-break {
+  display: none;
+}
+
+.photo-header > p:last-child {
+  margin: 15px 0 0;
+  color: #987579;
+  font-size: clamp(13px, 1.35vw, 17px);
+  letter-spacing: 0.04em;
+}
+
+.film-window {
+  position: relative;
+  padding: 35px 0;
+  border-top: 1px solid rgba(135, 84, 88, 0.16);
+  border-bottom: 1px solid rgba(135, 84, 88, 0.16);
+  background: rgba(255, 250, 240, 0.38);
+  box-shadow: inset 0 20px 60px rgba(255, 255, 255, 0.46);
+}
+
+.film-sprockets {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 15px;
+  opacity: 0.32;
+  background: radial-gradient(
+      circle,
+      rgba(99, 67, 70, 0.55) 0 3px,
+      transparent 3.5px
+    )
+    0 0 / 30px 15px repeat-x;
+}
+
+.film-sprockets.top {
+  top: 7px;
+}
+
+.film-sprockets.bottom {
+  bottom: 7px;
+}
+
+.photo-track {
+  display: flex;
+  width: max-content;
+  will-change: transform;
+  animation: photo-flow var(--track-duration, 44s) linear infinite;
+}
+
+.photo-track.is-paused {
+  animation-play-state: paused;
+}
+
+.photo-track-set {
+  display: flex;
+  flex: 0 0 auto;
+  gap: var(--photo-card-gap);
+  padding-right: var(--photo-card-gap);
+}
+
+.photo-card {
+  position: relative;
+  flex: 0 0 var(--photo-card-width);
+  cursor: zoom-in;
+  outline: none;
+  transform: rotate(var(--tilt, 0deg));
+  transition: transform 300ms ease;
+}
+
+.photo-card:nth-child(even) {
+  margin-top: 28px;
+}
+
+.photo-card:hover {
+  z-index: 2;
+  transform: rotate(0) translateY(-8px) scale(1.025);
+}
+
+.photo-card:focus-visible {
+  z-index: 3;
+  border-radius: 9px;
+  box-shadow: 0 0 0 4px rgba(196, 102, 105, 0.28);
+  transform: rotate(0) translateY(-8px) scale(1.025);
+}
+
+.photo-caption {
+  min-height: 2.8em;
+  margin: 0;
+  color: #8b6468;
+  font-family: var(--font-romantic);
+  font-size: var(--photo-caption-size);
+  line-height: var(--photo-caption-line-height);
+  text-align: center;
+}
+
+.photo-frame {
+  position: relative;
+  aspect-ratio: var(--photo-card-aspect);
+  margin: 10px 0 12px;
+  padding: 11px 11px 38px;
+  overflow: hidden;
+  border-radius: 5px;
+  background: #fffdfa;
+  box-shadow:
+    0 23px 50px rgba(102, 62, 66, 0.18),
+    0 2px 5px rgba(102, 62, 66, 0.08);
+}
+
+.photo-frame::after {
+  content: attr(data-number);
+  position: absolute;
+  right: 15px;
+  bottom: 10px;
+  color: #c29b95;
+  font: 11px/1 Georgia, serif;
+  letter-spacing: 0.12em;
+}
+
+.photo-image,
+.photo-placeholder {
+  width: 100%;
+  height: 100%;
+  border-radius: 2px;
+}
+
+.photo-image {
+  position: relative;
+  z-index: 2;
+  display: block;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 500ms ease;
+}
+
+.photo-frame.has-image .photo-image {
+  opacity: 1;
+}
+
+.photo-placeholder {
+  position: absolute;
+  inset: 11px 11px 38px;
+  display: grid;
+  place-items: center;
+  width: auto;
+  height: auto;
+  background:
+    radial-gradient(circle at 70% 18%, rgba(255, 241, 189, 0.8), transparent 22%),
+    linear-gradient(145deg, #f8d7c8, #d98984);
+  color: rgba(255, 252, 242, 0.9);
+}
+
+.placeholder-mark {
+  position: relative;
+  width: 82px;
+  height: 72px;
+}
+
+.placeholder-mark::before,
+.placeholder-mark::after,
+.placeholder-mark > span {
+  content: "";
+  position: absolute;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+}
+
+.placeholder-mark > span {
+  left: 17px;
+  bottom: 0;
+  width: 48px;
+  height: 48px;
+}
+
+.placeholder-mark::before {
+  left: 3px;
+  top: 0;
+  width: 32px;
+  height: 32px;
+}
+
+.placeholder-mark::after {
+  right: 3px;
+  top: 0;
+  width: 32px;
+  height: 32px;
+}
+
+.placeholder-label {
+  position: absolute;
+  right: 0;
+  bottom: 15%;
+  left: 0;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-align: center;
+}
+
+.lightbox-open {
+  overflow: hidden;
+}
+
+/* 点击单张照片后的放大弹层。 */
+.photo-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: clamp(16px, 4vw, 42px);
+  pointer-events: none;
+  visibility: hidden;
+  opacity: 0;
+  background:
+    radial-gradient(circle at 50% 36%, rgba(255, 228, 191, 0.24), transparent 34%),
+    rgba(78, 48, 52, 0.58);
+  backdrop-filter: blur(14px) saturate(0.82);
+  transition:
+    opacity 420ms ease,
+    visibility 420ms ease;
+}
+
+.photo-lightbox.is-visible {
+  pointer-events: auto;
+  visibility: visible;
+  opacity: 1;
+}
+
+.lightbox-card {
+  position: relative;
+  width: min(var(--lightbox-card-width), calc(100vw - 32px));
+  max-height: calc(100svh - 32px);
+  padding: clamp(22px, 4vw, 38px);
+  overflow: auto;
+  border: 1px solid rgba(155, 88, 91, 0.17);
+  border-radius: 30px 12px 30px 12px;
+  background:
+    linear-gradient(rgba(255, 252, 242, 0.96), rgba(255, 243, 224, 0.98)),
+    repeating-linear-gradient(
+      0deg,
+      transparent 0 29px,
+      rgba(197, 113, 114, 0.055) 29px 30px
+    );
+  box-shadow:
+    0 40px 100px rgba(62, 37, 41, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  transform: translateY(22px) scale(0.92) rotate(1deg);
+  transition: transform 520ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.photo-lightbox.is-visible .lightbox-card {
+  transform: translateY(0) scale(1) rotate(-0.6deg);
+}
+
+.lightbox-close {
+  position: fixed;
+  top: max(18px, env(safe-area-inset-top));
+  right: max(18px, env(safe-area-inset-right));
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  padding: 0 0 4px;
+  border: 1px solid rgba(255, 255, 255, 0.48);
+  border-radius: 50%;
+  background: rgba(103, 61, 66, 0.74);
+  box-shadow: 0 12px 30px rgba(52, 29, 33, 0.24);
+  color: #fffaf0;
+  font: 34px/1 Georgia, serif;
+}
+
+.lightbox-caption {
+  margin: 0;
+  color: #75575b;
+  font-family: var(--font-romantic);
+  font-size: var(--lightbox-caption-size);
+  line-height: 1.65;
+  letter-spacing: 0.04em;
+  text-align: center;
+  text-wrap: balance;
+}
+
+.lightbox-caption-top {
+  margin-bottom: 15px;
+}
+
+.lightbox-caption-bottom {
+  margin-top: 16px;
+}
+
+.lightbox-frame {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: min(54svh, 530px);
+  overflow: hidden;
+  border: 10px solid rgba(255, 254, 249, 0.96);
+  border-radius: 7px;
+  background:
+    radial-gradient(circle at 72% 20%, rgba(255, 240, 185, 0.8), transparent 24%),
+    linear-gradient(145deg, #f8d7c8, #d98984);
+  box-shadow:
+    0 22px 50px rgba(101, 59, 64, 0.2),
+    0 0 0 1px rgba(154, 94, 97, 0.09);
+}
+
+.lightbox-image {
+  display: none;
+  width: 100%;
+  max-height: min(58svh, 610px);
+  object-fit: contain;
+}
+
+.lightbox-frame.has-image {
+  min-height: 0;
+  background: #f8e9dc;
+}
+
+.lightbox-frame.has-image .lightbox-image {
+  display: block;
+}
+
+.lightbox-placeholder {
+  display: grid;
+  place-items: center;
+  gap: 16px;
+  padding: 44px 20px;
+  color: rgba(255, 252, 242, 0.94);
+  font-size: 12px;
+  letter-spacing: 0.18em;
+  text-align: center;
+}
+
+.lightbox-placeholder[hidden] {
+  display: none;
+}
+
+.photo-progress {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 32px;
+}
+
+.photo-progress span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #c87f7d;
+  animation: progress-glow 1.8s ease-in-out infinite;
+}
+
+.photo-progress span:nth-child(2) {
+  animation-delay: 300ms;
+}
+
+.photo-progress span:nth-child(3) {
+  animation-delay: 600ms;
+}
+
+.story-next {
+  display: block;
+  margin: 24px auto 0;
+  padding: 10px 20px;
+  background: rgba(154, 94, 97, 0.82);
+  box-shadow: 0 9px 22px rgba(117, 70, 73, 0.18);
+  opacity: 0;
+  transform: translateY(10px);
+  pointer-events: none;
+}
+
+.story-next.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+/* ===========================================================================
+ * 5. 礼物邀请、礼物盒和生日卡片
+ * ======================================================================== */
+
+.gift-guide {
+  position: fixed;
+  right: -620px;
+  bottom: max(12px, env(safe-area-inset-bottom));
+  z-index: 8;
+  align-items: flex-end;
+  transition:
+    right 1.1s cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 500ms ease;
+}
+
+.gift-guide.is-visible {
+  right: clamp(12px, 5vw, 70px);
+}
+
+.gift-guide .mouse-mascot {
+  width: clamp(120px, 17vw, 210px);
+}
+
+.gift-guide .speech-bubble {
+  width: min(300px, 38vw);
+  margin-bottom: 22%;
+}
+
+.gift-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  visibility: hidden;
+  opacity: 0;
+  background: rgba(87, 56, 59, 0.42);
+  backdrop-filter: blur(1px);
+  transition:
+    opacity 700ms ease,
+    visibility 700ms ease,
+    backdrop-filter 900ms ease;
+}
+
+.gift-overlay.is-visible {
+  pointer-events: auto;
+  visibility: visible;
+  opacity: 1;
+  backdrop-filter: blur(11px);
+}
+
+.gift-glow {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: min(720px, 90vw);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 236, 172, 0.68), rgba(255, 219, 175, 0.22) 38%, transparent 68%);
+  filter: blur(10px);
+  transform: translate(-50%, -50%) scale(0.55);
+  opacity: 0;
+}
+
+.gift-overlay.is-visible .gift-glow {
+  animation: gift-glow-in 1.4s 250ms ease forwards,
+    gift-glow-pulse 3s 1.6s ease-in-out infinite;
+}
+
+.gift-experience {
+  position: relative;
+  width: min(760px, 100vw);
+  height: min(720px, 100svh);
+}
+
+.gift-whisper {
+  position: absolute;
+  top: 8%;
+  right: 0;
+  left: 0;
+  z-index: 7;
+  margin: 0;
+  color: rgba(255, 251, 238, 0.92);
+  font-family: var(--font-romantic);
+  font-size: clamp(14px, 2vw, 21px);
+  letter-spacing: 0.08em;
+  text-align: center;
+  opacity: 0;
+}
+
+.gift-overlay.is-visible .gift-whisper {
+  animation: whisper-in 700ms 250ms ease forwards;
+}
+
+.gift-overlay.card-revealed .gift-whisper {
+  animation: none;
+  opacity: 0;
+  transform: translateY(-10px);
+  transition:
+    opacity 380ms ease,
+    transform 380ms ease;
+}
+
+.gift-box {
+  position: absolute;
+  left: 50%;
+  bottom: 13%;
+  z-index: 4;
+  width: 190px;
+  height: 165px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  transform: translateX(-50%) translateY(35px) scale(0.75);
+  opacity: 0;
+  transition: transform 1s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.gift-overlay.is-visible .gift-box {
+  animation: gift-box-arrive 800ms 350ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.gift-base,
+.gift-lid,
+.gift-ribbon {
+  position: absolute;
+  display: block;
+}
+
+.gift-base {
+  right: 10px;
+  bottom: 0;
+  left: 10px;
+  height: 120px;
+  border-radius: 8px 8px 15px 15px;
+  background: linear-gradient(145deg, #d46d70, #b94e57);
+  box-shadow: 0 28px 45px rgba(71, 42, 45, 0.3);
+}
+
+.gift-lid {
+  top: 15px;
+  right: 0;
+  left: 0;
+  z-index: 4;
+  height: 46px;
+  border-radius: 8px;
+  background: linear-gradient(145deg, #ef9c81, #ce6468);
+  box-shadow: 0 7px 12px rgba(91, 47, 51, 0.2);
+  transform-origin: 18% 90%;
+  transition: transform 900ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.gift-ribbon {
+  z-index: 5;
+  background: linear-gradient(90deg, #f2c56c, #ffe0a0, #dba44c);
+  pointer-events: none;
+}
+
+.ribbon-vertical {
+  top: 15px;
+  bottom: 0;
+  left: calc(50% - 13px);
+  width: 26px;
+}
+
+.ribbon-horizontal {
+  right: 10px;
+  bottom: 48px;
+  left: 10px;
+  height: 23px;
+}
+
+.gift-bow,
+.gift-knot {
+  position: absolute;
+  top: -34px;
+  z-index: 7;
+  display: block;
+  background: #f1c36a;
+}
+
+.gift-bow {
+  width: 53px;
+  height: 40px;
+  border-radius: 60% 45% 60% 45%;
+}
+
+.bow-left {
+  left: 46px;
+  transform: rotate(24deg);
+}
+
+.bow-right {
+  right: 46px;
+  transform: scaleX(-1) rotate(24deg);
+}
+
+.gift-knot {
+  left: calc(50% - 16px);
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+}
+
+.gift-box.is-open {
+  transform: translateX(-50%) translateY(100px) scale(0.72);
+}
+
+.gift-box.is-open .gift-lid {
+  transform: translate(-52px, -86px) rotate(-26deg);
+}
+
+.gift-box.is-open .ribbon-vertical {
+  opacity: 0.48;
+}
+
+.birthday-card {
+  position: absolute;
+  left: 50%;
+  top: 49%;
+  z-index: 5;
+  width: min(var(--birthday-card-width), calc(100vw - 36px));
+  min-height: var(--birthday-card-min-height);
+  padding:
+    var(--birthday-card-padding-top)
+    var(--birthday-card-padding-x)
+    var(--birthday-card-padding-bottom);
+  border: 1px solid rgba(139, 83, 86, 0.15);
+  border-radius: 11px;
+  background:
+    linear-gradient(rgba(255, 252, 242, 0.92), rgba(255, 248, 229, 0.96)),
+    repeating-linear-gradient(0deg, transparent 0 27px, rgba(197, 113, 114, 0.08) 27px 28px);
+  box-shadow:
+    0 38px 90px rgba(67, 41, 44, 0.35),
+    inset 0 0 60px rgba(232, 184, 79, 0.1);
+  color: #65474b;
+  text-align: center;
+  opacity: 0;
+  transform: translate(-50%, 8%) scale(0.48) rotate(2deg);
+  transform-origin: 50% 100%;
+  transition:
+    opacity 850ms ease,
+    transform 1.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.card-portrait-wrap {
+  position: absolute;
+  left: 50%;
+  top: -116px;
+  z-index: 3;
+  width: clamp(170px, 22vw, 205px);
+  height: clamp(188px, 24vw, 224px);
+  pointer-events: none;
+  opacity: 0;
+  transform: translateX(-50%) translateY(34px) scale(0.72);
+  transform-origin: 50% 100%;
+  transition:
+    opacity 650ms 380ms ease,
+    transform 950ms 330ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.birthday-card.is-visible .card-portrait-wrap {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0) scale(1);
+}
+
+.card-portrait-halo {
+  position: absolute;
+  left: 50%;
+  bottom: 10px;
+  width: 76%;
+  aspect-ratio: 1;
+  border: 1px solid rgba(209, 126, 118, 0.22);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, rgba(255, 239, 189, 0.82), rgba(247, 191, 177, 0.34) 52%, transparent 72%);
+  box-shadow:
+    0 0 0 10px rgba(255, 244, 216, 0.17),
+    0 20px 42px rgba(91, 52, 57, 0.2);
+  transform: translateX(-50%);
+  animation: card-halo-pulse 3.4s ease-in-out infinite;
+}
+
+.gift-card-portrait {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center bottom;
+  filter:
+    drop-shadow(0 10px 12px rgba(70, 42, 46, 0.17))
+    drop-shadow(0 0 1px rgba(255, 250, 235, 0.8));
+  animation: card-portrait-float 4.2s 1.1s ease-in-out infinite;
+}
+
+.birthday-card.is-visible {
+  opacity: 1;
+  transform: translate(-50%, -52%) scale(1) rotate(-1deg);
+}
+
+.birthday-card::before,
+.birthday-card::after {
+  content: "✦";
+  position: absolute;
+  color: #dfae4c;
+  font-size: 20px;
+}
+
+.birthday-card::before {
+  top: 24px;
+  left: 28px;
+}
+
+.birthday-card::after {
+  right: 28px;
+  bottom: 24px;
+}
+
+.card-tape {
+  position: absolute;
+  top: -13px;
+  left: 50%;
+  width: 90px;
+  height: 28px;
+  background: rgba(243, 190, 151, 0.72);
+  transform: translateX(-50%) rotate(-2deg);
+  box-shadow: 0 1px 3px rgba(90, 57, 59, 0.1);
+}
+
+.birthday-card h2 {
+  margin: 0 0 22px;
+  color: #8c4d53;
+  font-family: var(--font-romantic);
+  font-size: var(--birthday-title-size);
+  font-weight: 500;
+}
+
+.card-lines {
+  color: #755b5d;
+  font-family: var(--font-romantic);
+  font-size: var(--birthday-body-size);
+  line-height: var(--birthday-body-line-height);
+}
+
+.card-lines p {
+  margin: 0.35em 0;
+}
+
+.card-signature {
+  margin: 24px 0 18px;
+  color: #ad696c;
+  font-family: var(--font-romantic);
+  font-size: var(--birthday-signature-size);
+  text-align: right;
+}
+
+.keep-gift {
+  padding: 10px 22px;
+  background: linear-gradient(135deg, #c66368, #dc8874);
+  box-shadow: 0 10px 24px rgba(176, 84, 91, 0.24);
+}
+
+.birthday-card.is-kept .keep-gift {
+  display: none;
+}
+
+.final-wish {
+  height: 0;
+  margin: 0;
+  overflow: hidden;
+  color: #b76d70;
+  font-family: var(--font-romantic);
+  font-size: clamp(15px, 2vw, 20px);
+  opacity: 0;
+  transform: translateY(10px);
+  transition:
+    height 500ms ease,
+    margin 500ms ease,
+    opacity 700ms 250ms ease,
+    transform 700ms 250ms ease;
+}
+
+.birthday-card.is-kept .final-wish {
+  height: auto;
+  margin-top: 15px;
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.sparkle {
+  position: absolute;
+  left: var(--left);
+  top: var(--top);
+  width: var(--size);
+  height: var(--size);
+  color: var(--sparkle-color);
+  opacity: 0;
+  transform: rotate(45deg) scale(0);
+}
+
+.sparkle::before,
+.sparkle::after {
+  content: "";
+  position: absolute;
+  inset: 45% 0;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.sparkle::after {
+  transform: rotate(90deg);
+}
+
+.gift-overlay.is-visible .sparkle {
+  animation: sparkle-twinkle var(--duration) var(--delay) ease-in-out infinite;
+}
+
+.floating-heart {
+  position: absolute;
+  left: var(--left);
+  bottom: -30px;
+  color: var(--heart-color);
+  font-size: var(--size);
+  opacity: 0;
+  animation: heart-float var(--duration) var(--delay) ease-in forwards;
+}
+
+/* ===========================================================================
+ * 6. 生日故事各场景关键帧
+ * ======================================================================== */
+
+@keyframes mouse-arrives {
+  from {
+    transform: translateX(150px) rotate(8deg) scale(0.86);
+  }
+  72% {
+    transform: translateX(-9px) rotate(-2deg) scale(1.03);
+  }
+  to {
+    transform: translateX(0) rotate(0) scale(1);
+  }
+}
+
+@keyframes mascot-breathe {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-1deg);
+  }
+  50% {
+    transform: translateY(-7px) rotate(1deg);
+  }
+}
+
+@keyframes footprint-appears {
+  from {
+    opacity: 0;
+    transform: translateX(30px) rotate(-16deg) scale(0.3);
+  }
+  to {
+    opacity: 0.62;
+    transform: translateX(0) rotate(-16deg) scale(1);
+  }
+}
+
+@keyframes transition-head-pop {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) rotate(var(--rotate)) scale(0);
+  }
+  68% {
+    opacity: 1;
+    transform: translate(-50%, -50%) rotate(calc(var(--rotate) + 8deg)) scale(1.18);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%, -50%) rotate(var(--rotate)) scale(1);
+  }
+}
+
+@keyframes transition-copy {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scene-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes aurora-drift {
+  from {
+    transform: translate(-2%, -1%) rotate(-2deg);
+  }
+  to {
+    transform: translate(3%, 2%) rotate(2deg);
+  }
+}
+
+@keyframes photo-flow {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes card-portrait-float {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-1deg);
+  }
+  50% {
+    transform: translateY(-7px) rotate(1deg);
+  }
+}
+
+@keyframes card-halo-pulse {
+  0%,
+  100% {
+    opacity: 0.72;
+    transform: translateX(-50%) scale(0.94);
+  }
+  50% {
+    opacity: 1;
+    transform: translateX(-50%) scale(1.04);
+  }
+}
+
+@keyframes progress-glow {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.8);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+}
+
+@keyframes gift-glow-in {
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+@keyframes gift-glow-pulse {
+  0%,
+  100% {
+    transform: translate(-50%, -50%) scale(0.95);
+    opacity: 0.7;
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.08);
+    opacity: 1;
+  }
+}
+
+@keyframes whisper-in {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes gift-box-arrive {
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+}
+
+@keyframes sparkle-twinkle {
+  0%,
+  100% {
+    opacity: 0;
+    transform: rotate(45deg) scale(0.2);
+  }
+  45%,
+  65% {
+    opacity: 0.95;
+    transform: rotate(85deg) scale(1);
+  }
+}
+
+@keyframes heart-float {
+  0% {
+    opacity: 0;
+    transform: translateY(0) rotate(-12deg) scale(0.65);
+  }
+  15% {
+    opacity: 0.9;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-105vh) rotate(22deg) scale(1.2);
+  }
+}
+
+/* ===========================================================================
+ * 7. 手机端二次适配
+ * 这里只覆盖生日故事扩展部分；电脑端参数仍由 :root 控制。
+ * ======================================================================== */
+@media (max-width: 700px) {
+  .intro-guide {
+    width: 66%;
+  }
+
+  .intro-guide .mouse-mascot {
+    width: 27%;
+  }
+
+  .intro-guide .speech-bubble {
+    width: 69%;
+    margin-bottom: 7%;
+    padding: 8px 10px;
+    border-radius: 14px 14px 14px 5px;
+  }
+
+  .intro-guide .speech-bubble p {
+    margin: 2px 0 6px;
+    font-size: clamp(7px, 2.2vw, 10px);
+    line-height: 1.35;
+  }
+
+  .intro-guide .speech-kicker {
+    font-size: 6px;
+  }
+
+  .intro-guide .warm-button {
+    padding: 4px 8px;
+    font-size: 7px;
+  }
+
+  .photo-content {
+    padding-top: 84px;
+  }
+
+  .photo-header {
+    width: calc(100% - 32px);
+    margin-bottom: 32px;
+  }
+
+  .photo-header h1 {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    word-break: break-all;
+    text-wrap: balance;
+  }
+
+  .photo-header h1 {
+    font-size: clamp(26px, 8vw, 34px);
+    line-height: 1.28;
+  }
+
+  .mobile-title-break {
+    display: block;
+  }
+
+  .photo-card {
+    /* 手机照片卡片单独缩窄；想让上下文字更易保持一行可适当增大 74vw。 */
+    flex-basis: min(74vw, 290px);
+  }
+
+  .lightbox-card {
+    padding: 22px 16px;
+    border-radius: 22px 9px 22px 9px;
+  }
+
+  .lightbox-frame {
+    min-height: min(46svh, 430px);
+    border-width: 7px;
+  }
+
+  .lightbox-close {
+    width: 40px;
+    height: 40px;
+    font-size: 29px;
+  }
+
+  .gift-guide {
+    right: -110vw;
+    bottom: 8px;
+    gap: 2px;
+  }
+
+  .gift-guide.is-visible {
+    right: 8px;
+  }
+
+  .gift-guide .mouse-mascot {
+    width: 34vw;
+  }
+
+  .gift-guide .speech-bubble {
+    width: 56vw;
+    margin-bottom: 22vw;
+    padding: 14px;
+  }
+
+  .gift-guide .speech-bubble p {
+    font-size: 15px;
+  }
+
+  .gift-experience {
+    height: 100svh;
+  }
+
+  .gift-whisper {
+    top: 5%;
+  }
+
+  .gift-box {
+    bottom: 6%;
+    width: 145px;
+    height: 130px;
+  }
+
+  .gift-base {
+    height: 92px;
+  }
+
+  .gift-lid {
+    height: 38px;
+  }
+
+  .birthday-card {
+    /* 手机卡片需要独立尺寸，避免直接沿用桌面端 530px 宽度。 */
+    top: 45%;
+    min-height: 0;
+    width: calc(100vw - 28px);
+    padding: 88px 24px 26px;
+  }
+
+  .card-portrait-wrap {
+    top: -91px;
+    width: 154px;
+    height: 170px;
+  }
+
+  .birthday-card.is-visible {
+    transform: translate(-50%, -49%) scale(1) rotate(-1deg);
+  }
+
+  .card-signature {
+    margin-top: 17px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mouse-guide.is-visible .mouse-mascot,
+  .mouse-transition.is-active .transition-head,
+  .mouse-transition.is-active > p,
+  .photo-aurora,
+  .photo-progress span,
+  .gift-overlay.is-visible .gift-glow,
+  .gift-overlay.is-visible .gift-whisper,
+  .gift-overlay.is-visible .gift-box,
+  .gift-overlay.is-visible .sparkle,
+  .gift-card-portrait,
+  .card-portrait-halo {
+    animation-duration: 1ms;
+    animation-delay: 0ms;
+  }
+
+  .photo-track {
+    animation-duration: 90s;
+  }
+
+}

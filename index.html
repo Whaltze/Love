@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <!--
+      页面基础信息：
+      1. charset 必须保持 UTF-8，否则中文会乱码。
+      2. viewport 让页面在手机上按真实宽度显示。
+      3. 页面颜色、字号、卡片大小等视觉参数主要在 style.css 顶部 :root 中调整。
+    -->
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#fff8ef" />
+    <meta
+      name="description"
+      content="从爱心树到生日愿望、照片流与惊喜礼物的浪漫互动网页。"
+    />
+    <title>爱心树 · 生日惊喜</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body data-phase="opening">
+    <!--
+      开场追逐爱心：
+      爱心的位置和移动节奏由 script.js 读取 birthday-content.js 中的 opening 配置。
+      开场标题、说明和耳机提示可以直接修改下方文字。
+    -->
+    <section
+      id="openingGate"
+      class="opening-gate"
+      aria-labelledby="openingTitle"
+      aria-describedby="openingDescription openingNotice"
+    >
+      <div class="opening-ambient" aria-hidden="true">
+        <span>♥</span><span>♥</span><span>♥</span><span>♥</span>
+      </div>
+
+      <header class="opening-copy">
+        <p class="opening-eyebrow">A LITTLE GAME BEFORE LOVE</p>
+        <h1 id="openingTitle">先抓住这颗心</h1>
+        <p id="openingDescription">它有一点害羞，会在屏幕里偷偷跑来跑去。</p>
+      </header>
+
+      <!-- 爱心只在此区域内移动，避免压住上方标题和下方耳机提示。 -->
+      <div id="catchArena" class="catch-arena">
+        <button
+          id="catchHeart"
+          class="catch-heart"
+          type="button"
+          aria-label="抓住移动的爱心，进入生日故事"
+        >
+          <span class="catch-heart-shape" aria-hidden="true">♥</span>
+          <span class="catch-heart-label" aria-hidden="true">抓住我</span>
+        </button>
+        <div id="catchTrail" class="catch-trail" aria-hidden="true"></div>
+      </div>
+
+      <p id="openingNotice" class="opening-notice">
+        <span class="headphone-icon" aria-hidden="true">♫</span>
+        <span id="openingNoticeText">请在安静环境，佩戴耳机为佳</span>
+      </p>
+      <p class="opening-tip">成功点击爱心后，故事才会开始</p>
+    </section>
+
+    <!--
+      背景音乐：
+      音频地址可替换 source 的 src。
+      如果远程音频不可用，script.js 会自动使用内置的轻柔合成旋律作为备用。
+    -->
+    <audio id="backgroundMusic" loop preload="none">
+      <source
+        src="http://m2.music.126.net/GvIMZ5ZW0l04xFMVYtTy8g==/18502581673300022.mp3"
+        type="audio/mpeg"
+      />
+    </audio>
+
+    <button
+      id="musicToggle"
+      class="music-toggle"
+      type="button"
+      aria-label="播放背景音乐"
+      aria-pressed="false"
+      title="播放或暂停背景音乐"
+    >
+      <span aria-hidden="true">♪</span>
+      <span class="music-label">音乐</span>
+    </button>
+
+    <!-- 第一幕：爱心种子、爱心树、文字打字机和相识计时。 -->
+    <main id="main" class="heart-scene" aria-hidden="true">
+      <section id="stage" aria-label="爱心树互动动画">
+        <!-- 情书文字由 script.js / birthday-content.js 渲染。 -->
+        <div id="story" class="story-panel" aria-live="polite">
+          <div id="storyText"></div>
+        </div>
+
+        <!-- 相识日期在 birthday-content.js 的 relationship.startedAt 中修改。 -->
+        <div id="clockBox" class="clock-box" aria-live="off">
+          <div class="clock-heading">
+            爸爸<span> 与 </span>宝贝<span> 已经相识了</span>
+          </div>
+          <div id="clock"></div>
+        </div>
+
+        <!-- Canvas 负责绘制中央红心、树枝、花朵和飘落花瓣。 -->
+        <canvas
+          id="loveCanvas"
+          width="1100"
+          height="680"
+          role="button"
+          tabindex="0"
+          aria-label="点击红心，开启爱心树动画"
+        >
+          您的浏览器需要支持 HTML5 Canvas 才能观看动画。
+        </canvas>
+
+        <!-- 情书结束后，从右侧走出的米老鼠邀请区域。 -->
+        <div id="mouseIntro" class="mouse-guide intro-guide" aria-hidden="true">
+          <img
+            class="mouse-mascot mascot-image is-ready"
+            src="./assets/mickey-transparent-clean.png"
+            alt=""
+            aria-hidden="true"
+          />
+          <div class="speech-bubble">
+            <span class="speech-kicker">嘘，故事还没有结束……</span>
+            <p>现在跟我一起许下生日愿望吧~</p>
+            <button id="wishButton" class="warm-button" type="button">
+              一起许愿
+              <span aria-hidden="true">✦</span>
+            </button>
+          </div>
+          <span class="heart-footprint footprint-one" aria-hidden="true">♥</span>
+          <span class="heart-footprint footprint-two" aria-hidden="true">♥</span>
+          <span class="heart-footprint footprint-three" aria-hidden="true">♥</span>
+        </div>
+      </section>
+    </main>
+
+    <!-- 第二幕：持续流动的照片胶片。照片和文案在 birthday-content.js 中扩展。 -->
+    <section id="photoScene" class="photo-scene" aria-hidden="true">
+      <div class="photo-aurora" aria-hidden="true"></div>
+      <div id="photoContent" class="photo-content">
+        <header class="photo-header">
+          <p class="eyebrow">OUR LITTLE ARCHIVE</p>
+          <h1>让记忆，<br class="mobile-title-break" />慢慢经过眼前</h1>
+          <p>每一格画面，都是时间替我们珍藏的小小证据。</p>
+        </header>
+
+        <!-- photoTrack 的内容由 JavaScript 根据 photos 数组自动生成并复制为无缝循环。 -->
+        <div class="film-window" aria-label="流动的照片回忆">
+          <div class="film-sprockets top" aria-hidden="true"></div>
+          <div id="photoTrack" class="photo-track"></div>
+          <div class="film-sprockets bottom" aria-hidden="true"></div>
+        </div>
+
+        <div class="photo-progress" aria-hidden="true">
+          <span></span><span></span><span></span>
+        </div>
+
+        <button
+          id="finishPhotosButton"
+          class="story-next"
+          type="button"
+          aria-hidden="true"
+          tabindex="-1"
+        >
+          让故事继续
+          <span aria-hidden="true">→</span>
+        </button>
+      </div>
+
+      <!-- 照片播放到指定时间后出现的礼物引导角色。 -->
+      <div id="photoGiftGuide" class="mouse-guide gift-guide" aria-hidden="true">
+        <img
+          class="mouse-mascot mascot-image is-ready"
+          src="./assets/mickey-transparent-clean.png"
+          alt=""
+          aria-hidden="true"
+        />
+        <div class="speech-bubble">
+          <span class="speech-kicker">叮咚——</span>
+          <p>你有一个生日礼物，请签收~</p>
+          <button id="acceptGiftButton" class="warm-button" type="button">
+            签收礼物
+            <span aria-hidden="true">♥</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 点击单张照片后显示的全屏大图弹层；关闭时照片流恢复运动。 -->
+    <div
+      id="photoLightbox"
+      class="photo-lightbox"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="lightboxTopCaption"
+      aria-hidden="true"
+    >
+      <button
+        id="closePhotoLightbox"
+        class="lightbox-close"
+        type="button"
+        aria-label="关闭照片"
+      >
+        <span aria-hidden="true">×</span>
+      </button>
+      <article class="lightbox-card">
+        <p id="lightboxTopCaption" class="lightbox-caption lightbox-caption-top"></p>
+        <div id="lightboxFrame" class="lightbox-frame">
+          <img id="lightboxImage" class="lightbox-image" alt="" />
+          <div id="lightboxPlaceholder" class="lightbox-placeholder" aria-hidden="true">
+            <span class="placeholder-mark" aria-hidden="true"><span></span></span>
+            <span>照片接口已经为你留好</span>
+          </div>
+        </div>
+        <p id="lightboxBottomCaption" class="lightbox-caption lightbox-caption-bottom"></p>
+      </article>
+    </div>
+
+    <!-- 米老鼠头像铺满屏幕的场景转场；数量在 birthday-content.js effects 中修改。 -->
+    <div id="mouseTransition" class="mouse-transition" aria-hidden="true">
+      <div id="mouseHeads" class="mouse-heads"></div>
+      <p>把愿望藏进每一颗闪亮的心里</p>
+    </div>
+
+    <!-- 第三幕：礼物盒、背景虚化、头饰人像和生日卡片。 -->
+    <div id="giftOverlay" class="gift-overlay" aria-hidden="true">
+      <div class="gift-glow" aria-hidden="true"></div>
+      <div id="giftSparkles" class="gift-sparkles" aria-hidden="true"></div>
+      <div class="gift-experience">
+        <p class="gift-whisper">有些心意，要亲手拆开才算数</p>
+
+        <button id="giftBox" class="gift-box" type="button" aria-label="打开礼物盒">
+          <span class="gift-lid">
+            <span class="gift-bow bow-left"></span>
+            <span class="gift-bow bow-right"></span>
+            <span class="gift-knot"></span>
+          </span>
+          <span class="gift-base"></span>
+          <span class="gift-ribbon ribbon-vertical"></span>
+          <span class="gift-ribbon ribbon-horizontal"></span>
+        </button>
+
+        <!--
+          卡片尺寸、标题字号、正文行距等在 style.css 顶部“卡片调参变量”修改。
+          卡片文字在 birthday-content.js 的 card 对象中修改。
+        -->
+        <article id="birthdayCard" class="birthday-card" aria-live="polite">
+          <div class="card-portrait-wrap" aria-hidden="true">
+            <span class="card-portrait-halo"></span>
+            <img
+              class="gift-card-portrait"
+              src="./assets/portrait-headwear-cutout.png"
+              alt=""
+            />
+          </div>
+          <span class="card-tape" aria-hidden="true"></span>
+          <p id="cardEyebrow" class="card-eyebrow">FOR MY DEAREST</p>
+          <h2 id="cardTitle">这是一封留给你的生日卡片</h2>
+          <div id="cardLines" class="card-lines"></div>
+          <p id="cardSignature" class="card-signature"></p>
+          <button id="keepGiftButton" class="keep-gift" type="button">
+            收下这份心意
+          </button>
+          <p id="finalWish" class="final-wish">
+            愿你每一个愿望，都在未来被温柔接住。
+          </p>
+        </article>
+      </div>
+    </div>
+
+    <!-- 给读屏软件播报当前步骤，视觉上隐藏。 -->
+    <p id="interactionStatus" class="sr-only" aria-live="polite">
+      请先抓住屏幕中移动的红心，进入生日故事。
+    </p>
+
+    <!-- 禁用 JavaScript 时的降级提示。 -->
+    <noscript>
+      <p class="no-script">请开启 JavaScript 以观看完整的生日故事。</p>
+    </noscript>
+
+    <!--
+      加载顺序不要交换：
+      birthday-content.js 先提供所有可调内容和参数，
+      script.js 再读取这些配置并创建动画。
+    -->
+    <script src="./birthday-content.js" defer></script>
+    <script src="./script.js" defer></script>
+  </body>
+</html>
