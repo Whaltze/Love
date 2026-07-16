@@ -18,3 +18,5 @@ Desktop.ini
 
 # 如果以后临时安装前端依赖，不把依赖目录推送到仓库
 node_modules/
+
+photos/
