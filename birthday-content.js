@@ -130,6 +130,15 @@ window.BIRTHDAY_CONTENT = {
 
     // 无论照片多少，照片流完成一轮至少需要多少秒。
     minimumPhotoTrackSeconds: 38,
+
+    /**
+     * 手动浏览灵敏度：
+     * photoWheelSensitivity 控制鼠标滚轮/触控板每次推进的距离。
+     * photoSwipeSensitivity 控制手机或鼠标左右拖动时跟手的距离。
+     * 1 为自然速度；0.6 更柔和；1.5 更灵敏。
+     */
+    photoWheelSensitivity: 1,
+    photoSwipeSensitivity: 1,
   },
 
   /**
@@ -141,7 +150,7 @@ window.BIRTHDAY_CONTENT = {
    * 1. 把图片复制到 photos 文件夹。
    * 2. 复制下面任意一个完整的 { ... } 照片对象。
    * 3. 粘贴到 photos 数组末尾，确保前一个对象结尾保留逗号。
-   * 4. 修改 src、alt、top、bottom。
+   * 4. 修改 src、alt、top、bottom；视频还可以设置 type、poster、loop。
    *
    * 示例：
    * {
@@ -151,46 +160,155 @@ window.BIRTHDAY_CONTENT = {
    *   bottom: "照片下方的文字。",
    * },
    *
+   * MP4 / WebM 视频示例（视频在照片墙内会静音循环播放）：
+   * {
+   *   src: "./photos/memory-video.mp4",
+   *   type: "video",
+   *   poster: "./photos/memory-video-cover.jpg", // 可选：视频加载前的封面
+   *   autoplay: true,
+   *   loop: true,
+   *   muted: true, // 浏览器允许自动播放所必需，放大后可手动取消静音
+   *   alt: "一段生日视频回忆",
+   *   top: "视频上方的文字。",
+   *   bottom: "视频下方的文字。",
+   * },
+   *
+   * GIF 动图与普通图片写法完全相同，只需把 src 改成 "./photos/xxx.gif"。
+   * type 通常可以省略，程序会根据 mp4、webm、ogg 等扩展名自动识别视频。
+   *
    * 如果暂时没有图片，把 src 留空字符串 ""，网页会自动显示占位卡片。
-   * 照片数量无需在其他文件登记，JavaScript 会自动扩展并保持无缝流动。
+   * 图片、动图和视频数量无需在其他文件登记，JavaScript 会自动扩展并保持无缝流动。
    */
   photos: [
     {
-      src: "./photos/portrait-full.jpg",
-      alt: "第一张生日回忆照片",
-      top: "第一次把平凡的日子，认真地收进记忆里。",
-      bottom: "原来幸福，就是回头时你一直都在。",
+      src: "./photos/photos (10).jpg",
+      alt: "",
+      top: "不用刻意寻找浪漫，你站着的地方就是风景。",
+      bottom: "陪伴是最长情的告白，而你在就是最好的答案。"
     },
     {
-      src: "./SOURCE/肖像大头照.jpg",
-      alt: "第二张生日回忆照片",
-      top: "光落在脸上的时候，时间也变得很温柔。",
-      bottom: "愿往后的每一次快门，都有我们的笑容。",
+      src: "./photos/photos (5).jpg",
+      alt: "",
+      top: "在奔走于各自未来的日子里，请照顾好那个努力的自己。",
+      bottom: "愿你的每一次伏案，都能换来星光璀璨的明天。"
+    },
+
+    {
+      src: "./photos/2.jpg",
+      alt: "",
+      top: "风吹过裙摆的刹那，定格了整个季节的轻盈。",
+      bottom: "故事还长，这漫漫半生我们慢慢讲给岁月听。"
+    },
+
+    {
+      src: "./photos/photos (8).jpg",
+      alt: "",
+      top: "以后没有我碎碎念的岁月，你要学会自己给自己拥抱。",
+      bottom: "请把所有的热爱与期待，都毫无保留地留给自己。"
     },
     {
-      src: "",
-      alt: "第三张生日回忆照片",
-      top: "那些没有准备的瞬间，后来都成了珍藏。",
-      bottom: "爱把普通的一天，变成值得纪念的一天。",
+      src: "./photos/mv1.mp4",
+      alt: "",
+      top: "再忙碌的日子，也要记得给一日三餐留一点温柔的余地。",
+      bottom: "替我好好照顾那个，我曾在意过无数遍的你。"
     },
     {
-      src: "",
-      alt: "第四张生日回忆照片",
-      top: "一起走过的路，连风景都有了特别的名字。",
-      bottom: "下一站、下下一站，也想继续陪你抵达。",
+      src: "./photos/photos (14).jpg",
+      alt: "",
+      top: "谢谢你曾陪我走过一程，接下来的风景你要替我去赏。",
+      bottom: "岁岁安好，前路漫长，愿你一生清澈，一生勇敢。"
     },
     {
-      src: "",
-      alt: "第五张生日回忆照片",
+      src: "./photos/photos9.jpg",
+      alt: "",
+      top: "烛光跃动在你的眼眸，像是藏着一万个星系。",
+      bottom: "许下的每一个心愿，我都想为你保驾护航。"
+    },
+    {
+      src: "./photos/photos (16).jpg",
+      alt: "",
       top: "有你分享的快乐，总会在心里停留得更久。",
-      bottom: "把今天的愿望，交给明天慢慢实现。",
+      bottom: "把今天的愿望，交给明天慢慢实现。"
     },
     {
-      src: "",
-      alt: "第六张生日回忆照片",
-      top: "照片会褪色，但被爱着的感觉不会。",
-      bottom: "愿新的一岁，仍有花、星光和好多好多爱。",
+      src: "./photos/photos (9).jpg",
+      alt: "",
+      top: "第一次把平凡的日子，认真地收进记忆里。",
+      bottom: "原来幸福，就是回头时你一直都在。"
     },
+    {
+    src: "./photos/photos (2).jpg",
+    alt: "",
+    top: "一起走过的路，连风景都有了特别的名字。",
+    bottom: "下一站、下下一站，也想继续陪你抵达。"
+    },
+    {
+      src: "./photos/photos (11).jpg",
+      alt: "",
+      top: "照片会褪色，但被爱着的感觉不会。",
+      bottom: "愿新的一岁，仍有花、星光和好多好多爱。"
+    },
+    {
+      src: "./photos/photos (7).jpg",
+      alt: "",
+      top: "那些没有准备的瞬间，后来都成了珍藏。",
+      bottom: "爱把普通的一天，变成值得纪念的一天。"
+    },
+    {
+      src: "./photos/photos (4).jpg",
+      alt: "",
+      top: "书页里翻过的不仅是岁月，还有你不断生长的灵魂。",
+      bottom: "保持对世界的好奇，你终将成为自己的太阳。"
+    },
+    {
+      src: "./photos/肖像大头照.jpg",
+      alt: "",
+      top: "每一个崭新的清晨，都是为了迎接更好的你而存在。",
+      bottom: "把遗憾留在昨天，去拥抱那个无限可能的未来。"
+    },
+
+    {
+      src: "./photos/photos (6).jpg",
+      alt: "",
+      top: "走过四季的更迭，才懂得最美的诗句就在眼前。",
+      bottom: "岁岁年年，万喜万般宜，只要始终是你。"
+    },
+    {
+      src: "./photos/photos (1).jpg",
+      alt: "",
+      top: "光落在脸上的时候，时间也变得很温柔。",
+      bottom: "愿往后的每一次快门，都有我们的笑容。"
+    },
+    {
+      src: "./photos/photos (12).jpg",
+      alt: "",
+      top: "万水千山的旅程，愿你踏出的每一步都坚定且从容。",
+      bottom: "在我看不见的远方，请你务必熠熠生辉。"
+    },
+    {
+      src: "./photos/portrait-full.jpg",
+      alt: "",
+      top: "偶尔觉得孤单也没关系，那是你在独自长大的声音。",
+      bottom: "愿你拥有披荆斩棘的勇气，也有安然入梦的宁静。"
+    },
+
+    {
+      src: "./photos/photos (13).jpg",
+      alt: "",
+      top: "故事的分岔路口，我的缺席并不妨碍你的耀眼。",
+      bottom: "带着我的祝愿向前走吧，不要回头，要向着光。"
+    },
+
+
+    {
+      src: "./photos/photos (15).jpg",
+      alt: "",
+      top: "哪怕以后的路要一个人走，也要记得留意沿途的花香。",
+      bottom: "愿你把日子过得丰盈，连同我的那一份热忱。"
+    }
+
+
+
   ],
 
   /**

@@ -145,11 +145,25 @@
           <p>每一格画面，都是时间替我们珍藏的小小证据。</p>
         </header>
 
-        <!-- photoTrack 的内容由 JavaScript 根据 photos 数组自动生成并复制为无缝循环。 -->
-        <div class="film-window" aria-label="流动的照片回忆">
+        <!--
+          photoTrack 的内容由 JavaScript 根据 photos 数组自动生成并复制为无缝循环。
+          电脑端可以在此区域滚动滚轮，手机端可以横向滑动；停止操作后继续自动播放。
+        -->
+        <div
+          id="filmWindow"
+          class="film-window"
+          role="region"
+          tabindex="0"
+          aria-label="流动的照片和视频回忆"
+          aria-describedby="filmControlHint"
+        >
           <div class="film-sprockets top" aria-hidden="true"></div>
           <div id="photoTrack" class="photo-track"></div>
           <div class="film-sprockets bottom" aria-hidden="true"></div>
+          <p id="filmControlHint" class="film-control-hint">
+            <span aria-hidden="true">↔</span>
+            滚动滚轮或左右滑动可自由浏览
+          </p>
         </div>
 
         <div class="photo-progress" aria-hidden="true">
@@ -200,7 +214,7 @@
         id="closePhotoLightbox"
         class="lightbox-close"
         type="button"
-        aria-label="关闭照片"
+        aria-label="关闭照片或视频"
       >
         <span aria-hidden="true">×</span>
       </button>
@@ -208,9 +222,22 @@
         <p id="lightboxTopCaption" class="lightbox-caption lightbox-caption-top"></p>
         <div id="lightboxFrame" class="lightbox-frame">
           <img id="lightboxImage" class="lightbox-image" alt="" />
+          <!--
+            MP4 / WebM 点击放大后使用此播放器。
+            controls 提供播放、暂停、进度和全屏按钮；默认仍会静音循环播放。
+          -->
+          <video
+            id="lightboxVideo"
+            class="lightbox-video"
+            controls
+            loop
+            muted
+            playsinline
+            preload="metadata"
+          ></video>
           <div id="lightboxPlaceholder" class="lightbox-placeholder" aria-hidden="true">
             <span class="placeholder-mark" aria-hidden="true"><span></span></span>
-            <span>照片接口已经为你留好</span>
+            <span>照片或视频接口已经为你留好</span>
           </div>
         </div>
         <p id="lightboxBottomCaption" class="lightbox-caption lightbox-caption-bottom"></p>

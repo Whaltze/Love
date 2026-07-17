@@ -1059,11 +1059,67 @@ body[data-phase="opening-caught"] {
 
 .film-window {
   position: relative;
+  overflow: hidden;
   padding: 35px 0;
   border-top: 1px solid rgba(135, 84, 88, 0.16);
   border-bottom: 1px solid rgba(135, 84, 88, 0.16);
+  outline: none;
   background: rgba(255, 250, 240, 0.38);
   box-shadow: inset 0 20px 60px rgba(255, 255, 255, 0.46);
+  cursor: grab;
+  /* 保留手机纵向翻页与双指缩放，只把横向手势交给照片流。 */
+  touch-action: pan-y pinch-zoom;
+}
+
+.film-window:focus-visible {
+  box-shadow:
+    inset 0 20px 60px rgba(255, 255, 255, 0.46),
+    inset 0 0 0 3px rgba(196, 102, 105, 0.22);
+}
+
+.film-window.is-dragging {
+  cursor: grabbing;
+  user-select: none;
+}
+
+/*
+ * 滚轮/滑动提示位于胶片下沿。
+ * 想修改提示字号、颜色或位置，可直接调整本选择器。
+ */
+.film-control-hint {
+  position: absolute;
+  right: clamp(12px, 2.5vw, 34px);
+  bottom: 17px;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  padding: 6px 11px;
+  border: 1px solid rgba(147, 91, 95, 0.12);
+  border-radius: 999px;
+  background: rgba(255, 249, 237, 0.78);
+  box-shadow: 0 8px 22px rgba(95, 58, 62, 0.08);
+  color: rgba(121, 78, 82, 0.64);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  pointer-events: none;
+  backdrop-filter: blur(6px);
+  transition:
+    color 260ms ease,
+    background 260ms ease,
+    transform 260ms ease;
+}
+
+.film-control-hint > span {
+  color: #c16f70;
+  font: 15px/1 Georgia, serif;
+}
+
+.film-window.is-manual .film-control-hint {
+  color: #8d555a;
+  background: rgba(255, 247, 231, 0.95);
+  transform: translateY(-2px);
 }
 
 .film-sprockets {
@@ -1095,7 +1151,8 @@ body[data-phase="opening-caught"] {
   animation: photo-flow var(--track-duration, 44s) linear infinite;
 }
 
-.photo-track.is-paused {
+.photo-track.is-paused,
+.photo-track.is-dragging {
   animation-play-state: paused;
 }
 
@@ -1122,6 +1179,11 @@ body[data-phase="opening-caught"] {
 .photo-card:hover {
   z-index: 2;
   transform: rotate(0) translateY(-8px) scale(1.025);
+}
+
+.film-window.is-dragging .photo-card {
+  pointer-events: none;
+  transition: none;
 }
 
 .photo-card:focus-visible {
@@ -1164,14 +1226,14 @@ body[data-phase="opening-caught"] {
   letter-spacing: 0.12em;
 }
 
-.photo-image,
+.photo-media,
 .photo-placeholder {
   width: 100%;
   height: 100%;
   border-radius: 2px;
 }
 
-.photo-image {
+.photo-media {
   position: relative;
   z-index: 2;
   display: block;
@@ -1180,8 +1242,35 @@ body[data-phase="opening-caught"] {
   transition: opacity 500ms ease;
 }
 
-.photo-frame.has-image .photo-image {
+.photo-frame.has-media .photo-media {
   opacity: 1;
+}
+
+.photo-video {
+  background: #2d2425;
+  pointer-events: none;
+}
+
+/* 视频卡片右上角的小型循环标记；不需要时可把 display 改成 none。 */
+.photo-video-badge {
+  position: absolute;
+  top: 19px;
+  right: 19px;
+  z-index: 3;
+  display: none;
+  padding: 5px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.34);
+  border-radius: 999px;
+  background: rgba(73, 48, 51, 0.5);
+  color: rgba(255, 251, 239, 0.92);
+  font: 9px/1.1 Georgia, serif;
+  letter-spacing: 0.14em;
+  pointer-events: none;
+  backdrop-filter: blur(6px);
+}
+
+.photo-frame.has-video .photo-video-badge {
+  display: block;
 }
 
 .photo-placeholder {
@@ -1352,19 +1441,25 @@ body[data-phase="opening-caught"] {
     0 0 0 1px rgba(154, 94, 97, 0.09);
 }
 
-.lightbox-image {
+.lightbox-image,
+.lightbox-video {
   display: none;
   width: 100%;
   max-height: min(58svh, 610px);
   object-fit: contain;
 }
 
-.lightbox-frame.has-image {
+.lightbox-video {
+  background: #241f20;
+}
+
+.lightbox-frame.has-media {
   min-height: 0;
   background: #f8e9dc;
 }
 
-.lightbox-frame.has-image .lightbox-image {
+.lightbox-frame.has-image .lightbox-image,
+.lightbox-frame.has-video .lightbox-video {
   display: block;
 }
 

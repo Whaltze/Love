@@ -57,6 +57,7 @@
   const mouseHeads = document.querySelector("#mouseHeads");
   const photoScene = document.querySelector("#photoScene");
   const photoContent = document.querySelector("#photoContent");
+  const filmWindow = document.querySelector("#filmWindow");
   const photoTrack = document.querySelector("#photoTrack");
   const photoLightbox = document.querySelector("#photoLightbox");
   const closePhotoLightboxButton = document.querySelector(
@@ -68,6 +69,7 @@
   );
   const lightboxFrame = document.querySelector("#lightboxFrame");
   const lightboxImage = document.querySelector("#lightboxImage");
+  const lightboxVideo = document.querySelector("#lightboxVideo");
   const lightboxPlaceholder = document.querySelector(
     "#lightboxPlaceholder",
   );
@@ -287,6 +289,14 @@
   let giftOpened = false;
   let floatingHeartsCreated = false;
   let lightboxReturnTarget = null;
+  let photoPointerId = null;
+  let photoPointerStartX = 0;
+  let photoPointerStartY = 0;
+  let photoPointerLastX = 0;
+  let photoPointerDistance = 0;
+  let photoTrackDragging = false;
+  let suppressNextPhotoClick = false;
+  let filmHintTimer = 0;
   const sceneTimers = new Set();
 
   flattenBranches(branchConfig, 0);
@@ -347,10 +357,32 @@
   photoLightbox.addEventListener("click", (event) => {
     if (event.target === photoLightbox) closePhotoLightbox();
   });
-  lightboxImage.addEventListener("error", () => {
-    lightboxFrame.classList.remove("has-image");
-    lightboxPlaceholder.hidden = false;
-  });
+  lightboxImage.addEventListener("error", showLightboxPlaceholder);
+  lightboxVideo.addEventListener("error", showLightboxPlaceholder);
+
+  /**
+   * 照片流操作：
+   * - 电脑滚轮会沿照片轨道前后移动；
+   * - 手机或鼠标左右拖动时暂时接管轨道；
+   * - 松手后 CSS 自动动画从当前进度继续，不需要额外等待。
+   */
+  filmWindow.addEventListener("wheel", handlePhotoWheel, { passive: false });
+  filmWindow.addEventListener("pointerdown", startPhotoDrag);
+  filmWindow.addEventListener("pointermove", movePhotoDrag);
+  filmWindow.addEventListener("pointerup", finishPhotoDrag);
+  filmWindow.addEventListener("pointercancel", finishPhotoDrag);
+  filmWindow.addEventListener("lostpointercapture", finishPhotoDrag);
+  filmWindow.addEventListener("keydown", handlePhotoTrackKeyboard);
+  filmWindow.addEventListener(
+    "click",
+    (event) => {
+      if (!suppressNextPhotoClick) return;
+      event.preventDefault();
+      event.stopPropagation();
+      suppressNextPhotoClick = false;
+    },
+    true,
+  );
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && photoLightbox.classList.contains("is-visible")) {
       closePhotoLightbox();
@@ -966,7 +998,7 @@
     photoSceneStarted = true;
     setPhase("photos");
     interactionStatus.textContent =
-      "进入照片流场景，照片会从右向左缓缓经过，并显示上下文字说明。";
+      "进入回忆流场景，照片和视频会从右向左缓缓经过，并显示上下文字说明。";
 
     scheduleScene(
       () => {
@@ -1107,8 +1139,33 @@
     }
   }
 
-  // 为一条照片配置创建“上文字 + 相框 + 下文字”的完整卡片。
+  /**
+   * 判断一条素材是图片还是视频。
+   * 可在 birthday-content.js 中显式填写 type: "video" / "image"；
+   * 不填写时，会根据 mp4、webm、ogg 等文件扩展名自动识别。
+   * GIF 属于图片格式，因此会由浏览器自动循环播放，无需额外配置。
+   */
+  function getPhotoMediaType(photo, source) {
+    const configuredType =
+      typeof photo.type === "string" ? photo.type.trim().toLowerCase() : "";
+    if (configuredType === "video" || configuredType === "image") {
+      return configuredType;
+    }
+
+    return /\.(?:mp4|webm|ogg|ogv|m4v|mov)(?:[?#].*)?$/i.test(source)
+      ? "video"
+      : "image";
+  }
+
+  // 为一条图片或视频配置创建“上文字 + 相框 + 下文字”的完整卡片。
   function createPhotoCard(photo, index, isPrimarySet) {
+    const source = typeof photo.src === "string" ? photo.src.trim() : "";
+    const mediaType = getPhotoMediaType(photo, source);
+    const fallbackName =
+      mediaType === "video"
+        ? `第 ${index + 1} 段生日视频`
+        : `第 ${index + 1} 张生日照片`;
+
     const card = document.createElement("article");
     card.className = "photo-card";
     card.style.setProperty("--tilt", `${index % 2 ? 1.1 : -0.9}deg`);
@@ -1116,7 +1173,9 @@
     card.tabIndex = isPrimarySet ? 0 : -1;
     card.setAttribute(
       "aria-label",
-      `放大查看${photo.alt || `第 ${index + 1} 张生日照片`}`,
+      `${mediaType === "video" ? "播放查看" : "放大查看"}${
+        photo.alt || fallbackName
+      }`,
     );
 
     const topCaption = document.createElement("p");
@@ -1135,34 +1194,83 @@
     placeholderMark.append(document.createElement("span"));
     const placeholderLabel = document.createElement("span");
     placeholderLabel.className = "placeholder-label";
-    placeholderLabel.textContent = `在 photos 文件夹放入照片 ${String(
-      index + 1,
-    ).padStart(2, "0")}`;
+    placeholderLabel.textContent =
+      mediaType === "video"
+        ? `在 photos 文件夹放入视频 ${String(index + 1).padStart(2, "0")}`
+        : `在 photos 文件夹放入照片 ${String(index + 1).padStart(2, "0")}`;
     placeholder.append(placeholderMark, placeholderLabel);
     frame.append(placeholder);
 
-    const source = typeof photo.src === "string" ? photo.src.trim() : "";
     if (source) {
-      const image = document.createElement("img");
-      image.className = "photo-image";
-      image.loading = "lazy";
-      image.decoding = "async";
-      image.alt = photo.alt || `第 ${index + 1} 张生日照片`;
-      image.addEventListener(
-        "load",
-        () => frame.classList.add("has-image"),
-        { once: true },
-      );
-      image.addEventListener(
-        "error",
-        () => {
-          frame.classList.remove("has-image");
-          image.remove();
-        },
-        { once: true },
-      );
-      image.src = source;
-      frame.append(image);
+      if (mediaType === "video") {
+        const video = document.createElement("video");
+        video.className = "photo-media photo-video";
+        video.muted = photo.muted !== false;
+        video.defaultMuted = video.muted;
+        video.loop = photo.loop !== false;
+        video.autoplay = photo.autoplay !== false;
+        video.playsInline = true;
+        video.preload =
+          typeof photo.preload === "string" ? photo.preload : "metadata";
+        video.disablePictureInPicture = true;
+        video.setAttribute("aria-hidden", "true");
+        if (typeof photo.poster === "string" && photo.poster.trim()) {
+          video.poster = photo.poster.trim();
+        }
+        if (typeof photo.fit === "string" && photo.fit.trim()) {
+          video.style.objectFit = photo.fit.trim();
+        }
+        video.addEventListener(
+          "loadeddata",
+          () => {
+            frame.classList.add("has-media", "has-video");
+            if (video.autoplay) video.play().catch(() => {});
+          },
+          { once: true },
+        );
+        video.addEventListener(
+          "error",
+          () => {
+            frame.classList.remove("has-media", "has-video");
+            video.remove();
+          },
+          { once: true },
+        );
+        video.src = source;
+        frame.append(video);
+
+        // 小标签提示这是一段会循环播放的视频，不遮挡画面主体。
+        const videoBadge = document.createElement("span");
+        videoBadge.className = "photo-video-badge";
+        videoBadge.textContent = "LOOP";
+        videoBadge.setAttribute("aria-hidden", "true");
+        frame.append(videoBadge);
+      } else {
+        const image = document.createElement("img");
+        image.className = "photo-media photo-image";
+        image.loading = "lazy";
+        image.decoding = "async";
+        image.draggable = false;
+        image.alt = photo.alt || fallbackName;
+        if (typeof photo.fit === "string" && photo.fit.trim()) {
+          image.style.objectFit = photo.fit.trim();
+        }
+        image.addEventListener(
+          "load",
+          () => frame.classList.add("has-media", "has-image"),
+          { once: true },
+        );
+        image.addEventListener(
+          "error",
+          () => {
+            frame.classList.remove("has-media", "has-image");
+            image.remove();
+          },
+          { once: true },
+        );
+        image.src = source;
+        frame.append(image);
+      }
     }
 
     const bottomCaption = document.createElement("p");
@@ -1182,24 +1290,186 @@
     return card;
   }
 
-  // 放大照片并暂停照片轨道；trigger 用于关闭后恢复键盘焦点。
+  /**
+   * 找到 photo-flow 对应的 CSS 动画。
+   * 滚轮和拖动通过改变 currentTime 前后移动，因此松手后仍能无缝自动播放。
+   */
+  function getPhotoTrackAnimation() {
+    return (
+      photoTrack
+        .getAnimations()
+        .find((animation) => animation.animationName === "photo-flow") ||
+      photoTrack.getAnimations()[0] ||
+      null
+    );
+  }
+
+  // 把滚轮或滑动的像素距离换算成照片流动画进度。
+  function shiftPhotoTrackByPixels(pixelDistance) {
+    const animation = getPhotoTrackAnimation();
+    const firstSet = photoTrack.querySelector(".photo-track-set");
+    const loopDistance = firstSet?.getBoundingClientRect().width || 0;
+    const duration = Number(animation?.effect?.getTiming().duration);
+    if (!animation || !loopDistance || !Number.isFinite(duration) || !duration) {
+      return;
+    }
+
+    const currentTime = Number(animation.currentTime) || 0;
+    const timeDelta = (pixelDistance / loopDistance) * duration;
+    animation.currentTime =
+      ((currentTime + timeDelta) % duration + duration) % duration;
+  }
+
+  function showFilmInteractionHint() {
+    filmWindow.classList.add("is-manual");
+    window.clearTimeout(filmHintTimer);
+    filmHintTimer = window.setTimeout(() => {
+      filmWindow.classList.remove("is-manual");
+    }, 850);
+  }
+
+  // 鼠标纵向滚轮会转换成横向照片浏览；触控板横向滚动同样可用。
+  function handlePhotoWheel(event) {
+    if (
+      !photoScene.classList.contains("is-active") ||
+      photoLightbox.classList.contains("is-visible")
+    ) {
+      return;
+    }
+
+    const dominantDelta =
+      Math.abs(event.deltaX) > Math.abs(event.deltaY)
+        ? event.deltaX
+        : event.deltaY;
+    if (!dominantDelta) return;
+
+    event.preventDefault();
+    const deltaModeScale =
+      event.deltaMode === WheelEvent.DOM_DELTA_LINE
+        ? 32
+        : event.deltaMode === WheelEvent.DOM_DELTA_PAGE
+          ? Math.max(320, filmWindow.clientWidth)
+          : 1;
+    const sensitivity = configuredNumber(
+      effectsConfig.photoWheelSensitivity,
+      1,
+      0.1,
+    );
+    shiftPhotoTrackByPixels(dominantDelta * deltaModeScale * sensitivity);
+    showFilmInteractionHint();
+  }
+
+  // 记录手机手指或鼠标按下位置；确认是横向手势后才接管轨道。
+  function startPhotoDrag(event) {
+    if (
+      (event.pointerType === "mouse" && event.button !== 0) ||
+      !photoScene.classList.contains("is-active") ||
+      photoLightbox.classList.contains("is-visible")
+    ) {
+      return;
+    }
+
+    photoPointerId = event.pointerId;
+    photoPointerStartX = event.clientX;
+    photoPointerStartY = event.clientY;
+    photoPointerLastX = event.clientX;
+    photoPointerDistance = 0;
+    photoTrackDragging = false;
+  }
+
+  function movePhotoDrag(event) {
+    if (event.pointerId !== photoPointerId) return;
+
+    const totalX = event.clientX - photoPointerStartX;
+    const totalY = event.clientY - photoPointerStartY;
+    if (
+      !photoTrackDragging &&
+      Math.abs(totalX) > 8 &&
+      Math.abs(totalX) > Math.abs(totalY)
+    ) {
+      photoTrackDragging = true;
+      photoTrack.classList.add("is-dragging");
+      filmWindow.classList.add("is-dragging");
+      filmWindow.setPointerCapture?.(event.pointerId);
+    }
+
+    if (!photoTrackDragging) return;
+    event.preventDefault();
+    const stepX = event.clientX - photoPointerLastX;
+    const sensitivity = configuredNumber(
+      effectsConfig.photoSwipeSensitivity,
+      1,
+      0.1,
+    );
+    shiftPhotoTrackByPixels(-stepX * sensitivity);
+    photoPointerDistance += Math.abs(stepX);
+    photoPointerLastX = event.clientX;
+    showFilmInteractionHint();
+  }
+
+  function finishPhotoDrag(event) {
+    if (event.pointerId !== photoPointerId) return;
+
+    const pointerId = photoPointerId;
+    const wasDragging = photoTrackDragging;
+    suppressNextPhotoClick = wasDragging && photoPointerDistance > 8;
+    photoTrackDragging = false;
+    photoPointerId = null;
+    photoTrack.classList.remove("is-dragging");
+    filmWindow.classList.remove("is-dragging");
+
+    // 先清空内部状态再释放捕获，避免 lostpointercapture 重复执行收尾逻辑。
+    if (wasDragging && filmWindow.hasPointerCapture?.(pointerId)) {
+      filmWindow.releasePointerCapture(pointerId);
+    }
+
+    // 拖动结束后的 click 紧随 pointerup 触发；下一轮事件循环后即可解除拦截。
+    if (suppressNextPhotoClick) {
+      window.setTimeout(() => {
+        suppressNextPhotoClick = false;
+      }, 0);
+    }
+  }
+
+  // 键盘左右方向键也能浏览，方便没有滚轮或使用辅助设备的访客。
+  function handlePhotoTrackKeyboard(event) {
+    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+    event.preventDefault();
+    shiftPhotoTrackByPixels(event.key === "ArrowRight" ? 180 : -180);
+    showFilmInteractionHint();
+  }
+
+  // 放大图片或播放视频并暂停照片轨道；trigger 用于关闭后恢复键盘焦点。
   function openPhotoLightbox(photo, index, trigger) {
     if (!photoScene.classList.contains("is-active")) return;
 
     const source = typeof photo.src === "string" ? photo.src.trim() : "";
+    const mediaType = getPhotoMediaType(photo, source);
     lightboxReturnTarget = trigger;
     lightboxTopCaption.textContent =
       photo.top || "这里会放入一段温柔的小回忆。";
     lightboxBottomCaption.textContent =
       photo.bottom || "把这一刻，交给照片替我们记住。";
-    lightboxImage.alt = photo.alt || `第 ${index + 1} 张生日照片`;
-    lightboxFrame.classList.toggle("has-image", Boolean(source));
+    resetLightboxMedia();
     lightboxPlaceholder.hidden = Boolean(source);
 
-    if (source) {
+    if (source && mediaType === "video") {
+      lightboxFrame.classList.add("has-media", "has-video");
+      lightboxVideo.muted = true;
+      lightboxVideo.defaultMuted = true;
+      lightboxVideo.loop = photo.loop !== false;
+      lightboxVideo.playsInline = true;
+      if (typeof photo.poster === "string" && photo.poster.trim()) {
+        lightboxVideo.poster = photo.poster.trim();
+      } else {
+        lightboxVideo.removeAttribute("poster");
+      }
+      lightboxVideo.src = source;
+      lightboxVideo.play().catch(() => {});
+    } else if (source) {
+      lightboxFrame.classList.add("has-media", "has-image");
+      lightboxImage.alt = photo.alt || `第 ${index + 1} 张生日照片`;
       lightboxImage.src = source;
-    } else {
-      lightboxImage.removeAttribute("src");
     }
 
     photoTrack.classList.add("is-paused");
@@ -1207,18 +1477,37 @@
     photoLightbox.setAttribute("aria-hidden", "false");
     document.body.classList.add("lightbox-open");
     interactionStatus.textContent =
-      "照片已经放大，照片流暂时停下；关闭后会继续流动。";
+      mediaType === "video"
+        ? "视频已经打开并循环播放，照片流暂时停下；关闭后会继续流动。"
+        : "照片已经放大，照片流暂时停下；关闭后会继续流动。";
     closePhotoLightboxButton.focus({ preventScroll: true });
   }
 
-  // 关闭大图并恢复照片流动画。
+  // 媒体加载失败或关闭弹层时，清理图片与视频，避免视频在后台继续发声或耗电。
+  function resetLightboxMedia() {
+    lightboxFrame.classList.remove("has-media", "has-image", "has-video");
+    lightboxImage.removeAttribute("src");
+    lightboxImage.alt = "";
+    lightboxVideo.pause();
+    lightboxVideo.removeAttribute("src");
+    lightboxVideo.removeAttribute("poster");
+    lightboxVideo.load();
+  }
+
+  function showLightboxPlaceholder() {
+    resetLightboxMedia();
+    lightboxPlaceholder.hidden = false;
+  }
+
+  // 关闭放大层并恢复照片流动画。
   function closePhotoLightbox() {
     if (!photoLightbox.classList.contains("is-visible")) return;
     photoLightbox.classList.remove("is-visible");
     photoLightbox.setAttribute("aria-hidden", "true");
     document.body.classList.remove("lightbox-open");
     photoTrack.classList.remove("is-paused");
-    lightboxImage.removeAttribute("src");
+    resetLightboxMedia();
+    lightboxPlaceholder.hidden = false;
     interactionStatus.textContent = "照片流已经继续缓缓流动。";
 
     if (lightboxReturnTarget?.isConnected) {
@@ -1580,6 +1869,7 @@
     window.clearInterval(openingMoveTimer);
     window.clearInterval(clockTimer);
     window.clearInterval(synthTimer);
+    window.clearTimeout(filmHintTimer);
     for (const timer of sceneTimers) window.clearTimeout(timer);
     sceneTimers.clear();
     cancelAnimationFrame(storyAnimationId);
