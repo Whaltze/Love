@@ -391,8 +391,6 @@ window.BIRTHDAY_CONTENT = {
           end: "04:30",
         },
 
-
-
          // 1. 阿肆, 郭采洁 - 世界上的另一个我
         {
           track: "another-me-in-world",
@@ -435,12 +433,7 @@ window.BIRTHDAY_CONTENT = {
           end: null,
         },
 
-        // // 7. 萧潇 - 爱要坦荡荡
-        // {
-        //   track: "love-be-frank",
-        //   start: "00:15",
-        //   end: null,
-        // },
+
 
         // 8. 许嵩 - 有何不可
         {
@@ -482,10 +475,11 @@ window.BIRTHDAY_CONTENT = {
           start: "01:14",
           end: "03:13",
         },
-        // 13. G.E.M.邓紫棋 - 句号
+
+        // 7. 萧潇 - 爱要坦荡荡
         {
-          track: "full-stop",
-          start: "00:06",
+          track: "love-be-frank",
+          start: "00:15",
           end: null,
         },
 
@@ -591,7 +585,7 @@ window.BIRTHDAY_CONTENT = {
     copy:
         "To M.J.：\n\n" +
         // "　　人海茫茫，我们有幸相逢，从初识到相知。一同拥有过无数温柔美好的瞬间，历经误会，短暂别离。这个页面删删减减，多次改版每次意义不同！既是珍藏回忆，更是美好期许，命运兜兜转转，缘分让我们回到彼此身旁。往后岁岁朝朝，只想紧紧牵着你的手，共同奔赴万千世界。\n\n"+
-        "　　20岁，一个人生奇特的转折点。褪去十八岁的青涩，却又鲜有那份成熟。20岁是青春，更是力量！一段充满挣扎与考验的时光，一段自我沉淀迅速成长的年纪。非常有幸作为你人生的一位摆渡人，一起披荆斩棘，寻找彼岸。诚然过程似乎并不如想象般美好，从信封到网页，故事的意义发生了变化，但很高兴故事的结尾并没止步于此，命运兜兜转转，好巧认识你 ~ \n       无论如何，希望我们仍是最好的朋友，一位从呱呱落地6.6斤，到如今奋斗了7305天的好朋友！ \n"+
+        "　　20岁，一个人生奇特的转折点。褪去十八岁的青涩，却又鲜有那份成熟。20岁是青春，更是力量！一段充满挣扎与考验的时光，一段自我沉淀迅速成长的年纪。非常有幸作为你人生的一位摆渡人，一起披荆斩棘，寻找彼岸。诚然过程似乎并不如想象般美好，从信封到网页，故事的意义发生了变化，但很高兴故事的结尾并没止步于此，命运兜兜转转，好巧认识你 ~ \n       无论如何，希望我们仍是最好的朋友，一位从呱呱落地 6.6 斤，到如今奋斗了7305天的好朋友！ \n"+
         // "　　无论如何，希望我们仍是最好的朋友，一位从呱呱落地6.6kg，到如今奋斗了7304天的好朋友！\n\n"+
         "　　祝生日快乐！",
   },
@@ -621,7 +615,7 @@ window.BIRTHDAY_CONTENT = {
     photoContinueButtonMs: 1800,
 
     // 照片场景自动播放多久后，米老鼠带礼物出现。
-    photoDurationMs: 48000,
+    photoDurationMs: 180000,
 
     // 点击“签收礼物”后，礼物盒等待多久自动打开。
     giftOpenDelayMs: 720,
@@ -865,7 +859,7 @@ window.BIRTHDAY_CONTENT = {
       preview: "./assets/media/previews/photo-02.jpg",
       alt: "",
       top: "再忙碌的日子，也要记得给一日三餐留一点温柔的余地",
-      bottom: "好好照顾那个  我曾在意过无数遍的你。"
+      bottom: "好好照顾那个  我曾在意过无数遍的你"
     },
 
     {
@@ -874,7 +868,7 @@ window.BIRTHDAY_CONTENT = {
       preview: "./assets/media/previews/photo-03.jpg",
       alt: "",
       top: "风吹过裙摆的刹那，定格了季节的轻盈",
-      bottom: "故事还长，我们慢慢讲给岁月听。"
+      bottom: "故事还长，我们慢慢讲给岁月听"
     },
     {
       src: "./photos/mv1.mp4",
@@ -907,7 +901,7 @@ window.BIRTHDAY_CONTENT = {
       preview: "./assets/media/previews/photo-07.jpg",
       alt: "",
       top: "与你共享过的欢喜，会在心底久久滚烫，不曾消散",
-      bottom: "美好期许，慢慢兑现。"
+      bottom: "美好期许，慢慢兑现"
     },
     {
       src: "./photos/photos (9).jpg",
@@ -970,7 +964,7 @@ window.BIRTHDAY_CONTENT = {
       thumbnail: "./assets/media/thumbs/photo-09.jpg",
       preview: "./assets/media/previews/photo-09.jpg",
       alt: "",
-      top: "今晚月色真美。",
+      top: "今晚月色真美",
       bottom: "风也温柔，我很想你"
     },
 
@@ -996,7 +990,7 @@ window.BIRTHDAY_CONTENT = {
       thumbnail: "./assets/media/thumbs/photo-17.jpg",
       preview: "./assets/media/previews/photo-17.jpg",
       alt: "",
-      top: "见过无数落日晚霞，唯独对你满心牵挂",
+      top: "见过无数蓝天美景，唯独对你满心牵挂",
       bottom: "愿往后所有的美好，都奔赴向你而来"
     },
 
