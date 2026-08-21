@@ -362,7 +362,7 @@ window.BIRTHDAY_CONTENT = {
 
       // 【爱心树中央红心】
       // 进入爱心树页面后，点击画布中央的红心。
-      loveTreeHeart: 8,
+      loveTreeHeart: 9,
 
       // 【一起许愿】
       // 米老鼠出现后，点击“一起许愿”按钮。
@@ -391,11 +391,7 @@ window.BIRTHDAY_CONTENT = {
           end: "04:30",
         },
 
-        { //  "莫文蔚 - 慢慢喜欢你"
-          track: "slowly-fall-for-you",
-          start: "00:00",
-          end: "03:13",
-        },
+
 
          // 1. 阿肆, 郭采洁 - 世界上的另一个我
         {
@@ -480,7 +476,12 @@ window.BIRTHDAY_CONTENT = {
           start: "00:48",
           end: null,
         },
-
+        
+        { //  "莫文蔚 - 慢慢喜欢你"
+          track: "slowly-fall-for-you",
+          start: "00:00",
+          end: "03:13",
+        },
         // 13. G.E.M.邓紫棋 - 句号
         {
           track: "full-stop",
@@ -866,14 +867,7 @@ window.BIRTHDAY_CONTENT = {
       top: "再忙碌的日子，也要记得给一日三餐留一点温柔的余地",
       bottom: "好好照顾那个  我曾在意过无数遍的你。"
     },
-    {
-      src: "./photos/2.jpg",
-      thumbnail: "./assets/media/thumbs/photo-09.jpg",
-      preview: "./assets/media/previews/photo-09.jpg",
-      alt: "",
-      top: "今晚月色真美。",
-      bottom: "风也温柔，我很想你"
-    },
+
     {
       src: "./photos/photos (8).jpg",
       thumbnail: "./assets/media/thumbs/photo-03.jpg",
@@ -940,6 +934,14 @@ window.BIRTHDAY_CONTENT = {
       bottom: "下一站、下下一站，也想继续陪你抵达"
     },
     {
+      src: "./photos/肖像大头照.jpg",
+      thumbnail: "./assets/media/thumbs/photo-14.jpg",
+      preview: "./assets/media/previews/photo-14.jpg",
+      alt: "",
+      top: "有你分享的快乐，总会在心里停留得更久。",
+      bottom: "把今天的愿望，交给明天慢慢实现。"
+    },
+    {
       src: "./photos/photos (11).jpg",
       thumbnail: "./assets/media/thumbs/photo-11.jpg",
       preview: "./assets/media/previews/photo-11.jpg",
@@ -964,13 +966,14 @@ window.BIRTHDAY_CONTENT = {
       bottom: "永远保有对世界的热忱好奇，活成自己的太阳。"
     },
     {
-      src: "./photos/肖像大头照.jpg",
-      thumbnail: "./assets/media/thumbs/photo-14.jpg",
-      preview: "./assets/media/previews/photo-14.jpg",
+      src: "./photos/2.jpg",
+      thumbnail: "./assets/media/thumbs/photo-09.jpg",
+      preview: "./assets/media/previews/photo-09.jpg",
       alt: "",
-      top: "有你分享的快乐，总会在心里停留得更久。",
-      bottom: "把今天的愿望，交给明天慢慢实现。"
+      top: "今晚月色真美。",
+      bottom: "风也温柔，我很想你"
     },
+
     {  //     top: "走过四季的更迭，才懂得最美的诗句就在眼前。",
   //     bottom: "岁岁年年，万喜万般宜，只要始终是你。"
       src: "./photos/photos (6).jpg",
