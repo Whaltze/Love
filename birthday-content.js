@@ -594,7 +594,7 @@ window.BIRTHDAY_CONTENT = {
       storyLineHeight: 1.76,
 
       // 树和时间表共用的整体下移量与缩放比例。
-      heartArtOffsetYPx: 330,
+      heartArtOffsetYPx: 220,
       heartArtScale: 0.84,
 
       // 时间表相对树的二次微调；offset 可填写负数。
