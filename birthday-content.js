@@ -216,7 +216,7 @@ window.BIRTHDAY_CONTENT = {
         id: "what-i-miss",
         title: "孙燕姿 - 我怀念的",
         src: "./assets/audio/optimized/what-i-miss.mp3",
-        start: "02:21",
+        start: "01:14",
         end: "04:42",
       },
 
@@ -535,15 +535,15 @@ window.BIRTHDAY_CONTENT = {
 
       // 【签收礼物】
       // 点击“签收礼物”按钮。
-      acceptGiftButton: "NEXT",
+      acceptGiftButton: 23,
 
       // 【打开礼物盒】
       // 点击页面中央的礼物盒。
-      giftBox: "NEXT",
+      giftBox: "CONTINUE",
 
       // 【收下这份心意】
       // 点击生日卡片中的“收下这份心意”按钮。
-      keepGiftButton: "NEXT",
+      keepGiftButton: 10,
 
       // 【右上角音乐开关】
       // 手动暂停后再次点击音乐按钮，继续原来的歌曲和播放位置。
