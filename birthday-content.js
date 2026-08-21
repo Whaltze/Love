@@ -209,7 +209,7 @@ window.BIRTHDAY_CONTENT = {
         id: "dear-you",  // 开场爱心树
         title: "任素汐 - 亲爱的你啊",
         src: "./assets/audio/optimized/dear-you.mp3",
-        start: "00:00",
+        start: "00:15",
         end: "03:50",
       },
       {
@@ -476,7 +476,7 @@ window.BIRTHDAY_CONTENT = {
           start: "00:48",
           end: null,
         },
-        
+
         { //  "莫文蔚 - 慢慢喜欢你"
           track: "slowly-fall-for-you",
           start: "00:00",
