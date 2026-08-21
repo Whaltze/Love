@@ -1714,13 +1714,15 @@
   // 点击“一起许愿”后创建米老鼠头铺屏转场，再切换到照片流。
   function startMouseTransition() {
     if (phase !== "invitation") return;
+    ensurePhotoStreamBuilt();
+    createTransitionHeads();
+    beginSceneTransition();
     setPhase("transition");
     duckForMickeyAppearance();
     playChime([523.25, 659.25, 783.99], {
       // 米老鼠铺屏已单独触发压低；关闭这里的重复请求，避免较短时长覆盖它。
       duck: !musicDuckOnMickeyAppear,
     });
-    createTransitionHeads();
     mouseIntro.classList.remove("is-visible");
     mouseIntro.setAttribute("aria-hidden", "true");
     mouseTransition.classList.remove("is-revealing");
@@ -1728,32 +1730,41 @@
     mouseTransition.setAttribute("aria-hidden", "false");
     interactionStatus.textContent = "许愿转场开始，满屏圆耳鼠头像正在出现。";
 
-    scheduleScene(
-      () => {
-        mainScene.classList.add("scene-hidden");
-        mainScene.setAttribute("aria-hidden", "true");
-        photoScene.classList.add("is-active");
-        photoScene.setAttribute("aria-hidden", "false");
-        startPhotoScene();
-        window.scrollTo({ top: 0, behavior: "auto" });
-        mouseTransition.classList.add("is-revealing");
+    const transitionScale = getMobileTransitionScale();
+    const coverDuration = reducedMotion
+      ? 420
+      : Math.round(
+          configuredNumber(timingConfig.transitionCoverMs, 1900, 0) *
+            transitionScale,
+        );
+    const revealDuration = reducedMotion
+      ? 80
+      : Math.round(
+          configuredNumber(timingConfig.transitionRevealMs, 760, 0) *
+            transitionScale,
+        );
 
-        scheduleScene(() => {
-          mouseTransition.classList.remove("is-active", "is-revealing");
-          mouseTransition.setAttribute("aria-hidden", "true");
-        }, reducedMotion
-          ? 80
-          : configuredNumber(timingConfig.transitionRevealMs, 760, 0));
-      },
-      reducedMotion
-        ? 420
-        : configuredNumber(timingConfig.transitionCoverMs, 1900, 0),
-    );
+    scheduleScene(() => {
+      mainScene.classList.add("scene-hidden");
+      mainScene.setAttribute("aria-hidden", "true");
+      photoScene.classList.add("is-active");
+      photoScene.setAttribute("aria-hidden", "false");
+      startPhotoScene();
+      window.scrollTo({ top: 0, behavior: "auto" });
+      mouseTransition.classList.add("is-revealing");
+
+      scheduleScene(() => {
+        mouseTransition.classList.remove("is-active", "is-revealing");
+        mouseTransition.setAttribute("aria-hidden", "true");
+        endSceneTransition();
+      }, revealDuration);
+    }, coverDuration);
   }
 
   // 启动照片场景的按钮计时和自动礼物邀请计时。
   function startPhotoScene() {
     if (photoSceneStarted) return;
+    ensurePhotoStreamBuilt();
     photoSceneStarted = true;
     setPhase("photos");
     interactionStatus.textContent =
@@ -1807,6 +1818,8 @@
 
   function openGiftSequence() {
     if (phase !== "gift-invitation") return;
+    ensureGiftSparklesCreated();
+    beginSceneTransition();
     setPhase("gift");
     photoGiftGuide.classList.remove("is-visible");
     photoGiftGuide.setAttribute("aria-hidden", "true");
@@ -1835,6 +1848,7 @@
         giftOverlay.classList.add("card-revealed");
         birthdayCard.classList.add("is-visible");
         interactionStatus.textContent = "礼物盒打开了，一张生日卡片升了起来。";
+        endSceneTransition();
         keepGiftButton.focus({ preventScroll: true });
       },
       reducedMotion
@@ -1861,6 +1875,9 @@
    * 第二套是无障碍隐藏副本，用来衔接第一套，实现无限循环。
    */
   function buildPhotoStream() {
+    if (photoStreamBuilt) return;
+    photoStreamBuilt = true;
+
     const configuredPhotos = Array.isArray(birthdayContent.photos)
       ? birthdayContent.photos
       : [];
@@ -1900,6 +1917,7 @@
       photoTrack.append(set);
     }
     preparePhotoMediaLoading();
+    preparePhotoVideoPlayback();
   }
 
   function preparePhotoMediaLoading() {
@@ -1908,12 +1926,16 @@
 
     const pendingMedia = [...photoTrack.querySelectorAll("[data-photo-src]")];
     if (!("IntersectionObserver" in window)) {
-      pendingMedia.forEach(loadDeferredPhotoMedia);
+      const initialCount = Math.min(getPhotoInitialCount(), pendingMedia.length);
+      pendingMedia
+        .slice(0, initialCount)
+        .forEach((media) => loadDeferredPhotoMedia(media, true));
+      scheduleDeferredPhotoMediaFallback(pendingMedia.slice(initialCount));
       schedulePhotoThumbnailWarmup();
       return;
     }
 
-    const horizontalMargin = Math.round(photoLoadAheadScreens * 100);
+    const horizontalMargin = Math.round(getPhotoLoadAheadScreens() * 100);
     photoMediaObserver = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
@@ -1933,38 +1955,166 @@
   }
 
   function activatePhotoMediaLoading() {
+    ensurePhotoStreamBuilt();
     const media = [...photoTrack.querySelectorAll("[data-photo-src]")];
-    media.slice(0, Math.min(6, media.length)).forEach((item) => {
-      loadDeferredPhotoMedia(item);
+    media.slice(0, Math.min(getPhotoInitialCount(), media.length)).forEach((item) => {
+      loadDeferredPhotoMedia(item, true);
       photoMediaObserver?.unobserve(item);
     });
+    refreshPhotoVideoPlayback();
+  }
+
+  function scheduleDeferredPhotoMediaFallback(pendingMedia) {
+    if (!pendingMedia.length) return;
+    const configuredBatchSize = getPhotoThumbnailBatchSize();
+    const batchSize = Number.isFinite(configuredBatchSize)
+      ? Math.max(1, configuredBatchSize)
+      : pendingMedia.length;
+    let cursor = 0;
+
+    const loadNextBatch = () => {
+      if (cursor >= pendingMedia.length) return;
+      const nextCursor = Math.min(cursor + batchSize, pendingMedia.length);
+      pendingMedia
+        .slice(cursor, nextCursor)
+        .forEach((media) => loadDeferredPhotoMedia(media));
+      cursor = nextCursor;
+      if (cursor < pendingMedia.length) {
+        scheduleDeferredWork(
+          loadNextBatch,
+          Math.max(320, getPhotoThumbnailBatchGapMs()),
+        );
+      }
+    };
+
+    scheduleDeferredWork(loadNextBatch, getDeferredWorkDelayMs());
   }
 
   function schedulePhotoThumbnailWarmup() {
     window.clearTimeout(photoThumbnailWarmupTimer);
+    const generation = ++photoThumbnailWarmupGeneration;
     if (shouldSkipBackgroundPrefetch(photoSkipOnSaveData)) return;
-    photoThumbnailWarmupTimer = window.setTimeout(() => {
-      const thumbnailUrls = getConfiguredPhotos()
-        .map((photo) => getPhotoThumbnailSource(photo))
-        .filter(Boolean);
-      queueMediaPrefetch(thumbnailUrls, "image");
-    }, photoThumbnailWarmupDelayMs);
+
+    photoThumbnailWarmupTimer = scheduleDeferredWork(() => {
+      photoThumbnailWarmupTimer = 0;
+      const thumbnailUrls = [
+        ...new Set(
+          getConfiguredPhotos()
+            .map((photo) => getPhotoThumbnailSource(photo))
+            .filter(Boolean),
+        ),
+      ];
+      queuePhotoThumbnailBatch(thumbnailUrls, 0, generation);
+    }, getPhotoThumbnailWarmupDelayMs());
   }
 
-  function loadDeferredPhotoMedia(media) {
+  function queuePhotoThumbnailBatch(urls, startIndex, generation) {
+    if (
+      generation !== photoThumbnailWarmupGeneration ||
+      startIndex >= urls.length
+    ) {
+      return;
+    }
+
+    const configuredBatchSize = getPhotoThumbnailBatchSize();
+    const batchSize = Number.isFinite(configuredBatchSize)
+      ? Math.max(1, configuredBatchSize)
+      : urls.length;
+    const nextIndex = Math.min(startIndex + batchSize, urls.length);
+    const batch = urls.slice(startIndex, nextIndex);
+
+    queueMediaPrefetch(batch, "image").finally(() => {
+      if (
+        generation !== photoThumbnailWarmupGeneration ||
+        nextIndex >= urls.length
+      ) {
+        return;
+      }
+      scheduleDeferredWork(
+        () => queuePhotoThumbnailBatch(urls, nextIndex, generation),
+        getPhotoThumbnailBatchGapMs(),
+      );
+    });
+  }
+
+  function loadDeferredPhotoMedia(media, priority = false) {
     if (!(media instanceof HTMLElement) || media.dataset.loaded === "true") return;
     const source = media.dataset.photoSrc || "";
     if (!source) return;
+
+    if (nonCriticalWorkSuspended && !priority) {
+      scheduleDeferredWork(() => loadDeferredPhotoMedia(media), 320);
+      return;
+    }
+
     media.dataset.loaded = "true";
     media.removeAttribute("data-photo-src");
     if (media instanceof HTMLVideoElement) {
       media.src = source;
       media.load();
     } else if (media instanceof HTMLImageElement) {
+      media.fetchPriority = priority ? "high" : "low";
       media.src = source;
     }
   }
 
+  function preparePhotoVideoPlayback() {
+    photoVideoPlaybackObserver?.disconnect();
+    photoVideoPlaybackObserver = null;
+    const videos = [...photoTrack.querySelectorAll(".photo-video")];
+    videos.forEach((video) => {
+      video.dataset.videoVisible = "false";
+      video.pause();
+    });
+
+    if (!("IntersectionObserver" in window) || !videos.length) return;
+    photoVideoPlaybackObserver = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          const video = entry.target;
+          video.dataset.videoVisible = entry.isIntersecting ? "true" : "false";
+          updatePhotoVideoPlayback(video);
+        });
+      },
+      {
+        root: filmWindow,
+        rootMargin: "20px 18% 20px 18%",
+        threshold: 0.15,
+      },
+    );
+    videos.forEach((video) => photoVideoPlaybackObserver.observe(video));
+  }
+
+  function canPlayInlinePhotoVideos() {
+    return (
+      document.visibilityState !== "hidden" &&
+      photoScene.classList.contains("is-active") &&
+      (phase === "photos" || phase === "gift-invitation") &&
+      !photoLightbox.classList.contains("is-visible") &&
+      !document.body.classList.contains("is-scene-transitioning")
+    );
+  }
+
+  function updatePhotoVideoPlayback(video) {
+    if (!(video instanceof HTMLVideoElement)) return;
+    const shouldPlay =
+      canPlayInlinePhotoVideos() &&
+      video.dataset.videoVisible === "true" &&
+      video.dataset.autoplay !== "false" &&
+      video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA;
+    if (shouldPlay) {
+      video.play().catch(() => {});
+    } else {
+      video.pause();
+    }
+  }
+
+  function refreshPhotoVideoPlayback() {
+    if (!photoStreamBuilt) return;
+    photoTrack
+      .querySelectorAll(".photo-video")
+      .forEach(updatePhotoVideoPlayback);
+  }
   function getConfiguredPhotos() {
     return Array.isArray(birthdayContent.photos) ? birthdayContent.photos : [];
   }
@@ -1988,12 +2138,13 @@
   function prefetchPhotoPreview(photo) {
     if (shouldSkipBackgroundPrefetch(photoSkipOnSaveData)) return;
     const source = getPhotoPreviewSource(photo);
-    if (source) queueMediaPrefetch([source], "image");
+    if (source) queueMediaPrefetch([source], "image", { priority: true });
   }
 
   function prefetchNeighborPhotoPreviews(index) {
+    const neighborCount = getPhotoPreviewNeighborCount();
     if (
-      photoPreviewNeighborCount <= 0 ||
+      neighborCount <= 0 ||
       shouldSkipBackgroundPrefetch(photoSkipOnSaveData)
     ) {
       return;
@@ -2001,12 +2152,12 @@
     const photos = getConfiguredPhotos();
     if (!photos.length) return;
     const urls = [];
-    for (let offset = 1; offset <= photoPreviewNeighborCount; offset += 1) {
+    for (let offset = 1; offset <= neighborCount; offset += 1) {
       const previous = photos[positiveModulo(index - offset, photos.length)];
       const next = photos[positiveModulo(index + offset, photos.length)];
       urls.push(getPhotoPreviewSource(previous), getPhotoPreviewSource(next));
     }
-    queueMediaPrefetch(urls.filter(Boolean), "image");
+    queueMediaPrefetch(urls.filter(Boolean), "image", { priority: true });
   }
 
   // 访客主动开启“节省流量”后，不在后台抢先下载尚未查看的素材。
@@ -2063,9 +2214,9 @@
   function queueMediaPrefetch(sources, mediaType = "image", options = {}) {
     const sourceList = Array.isArray(sources) ? sources : [sources];
     const normalizedType = mediaType === "audio" ? "audio" : "image";
+    const priority = options?.priority === true;
 
     if (normalizedType === "audio") {
-      const priority = options?.priority === true;
       const queuedJobs = [];
 
       sourceList.forEach((source) => {
@@ -2075,6 +2226,7 @@
         const pendingJob = pendingAudioPrefetchJobs.get(url);
         if (pendingJob) {
           if (priority) {
+            pendingJob.priority = true;
             const pendingIndex = audioPrefetchQueue.indexOf(pendingJob);
             if (pendingIndex >= 0) {
               audioPrefetchQueue.splice(pendingIndex, 1);
@@ -2086,7 +2238,7 @@
 
         if (prefetchedMediaUrls.has(url)) return;
         prefetchedMediaUrls.add(url);
-        const job = { url };
+        const job = { url, priority };
         pendingAudioPrefetchJobs.set(url, job);
         queuedJobs.push(job);
       });
@@ -2108,6 +2260,7 @@
       if (!url || prefetchedMediaUrls.has(url)) return;
       prefetchedMediaUrls.add(url);
       queue = queue
+        .then(() => waitForNonCriticalWork(priority))
         .then(() => prefetchSingleMediaUrl(url, normalizedType))
         .catch(() => {
           prefetchedMediaUrls.delete(url);
@@ -2125,6 +2278,8 @@
     try {
       while (audioPrefetchQueue.length) {
         const job = audioPrefetchQueue.shift();
+        if (!job) continue;
+        await waitForNonCriticalWork(job.priority === true);
         pendingAudioPrefetchJobs.delete(job.url);
         try {
           await prefetchSingleMediaUrl(job.url, "audio");
@@ -2134,10 +2289,11 @@
       }
     } finally {
       audioPrefetchRunning = false;
-      if (audioPrefetchQueue.length) void drainAudioPrefetchQueue();
+      if (audioPrefetchQueue.length && !nonCriticalWorkSuspended) {
+        void drainAudioPrefetchQueue();
+      }
     }
   }
-
   async function prefetchSingleMediaUrl(url, mediaType) {
     const usePersistentWorker =
       serviceWorkerEnabled &&
@@ -2298,7 +2454,7 @@
     appendAction(getMusicActionForPrefetch("loveTreeHeart"));
     appendAction(getMusicActionForPrefetch("wishButton"));
 
-    for (let index = 0; index < musicPhotoPreloadAhead; index += 1) {
+    for (let index = 0; index < getMusicPhotoPreloadAhead(); index += 1) {
       appendAction(getMusicActionForPrefetch("photoCard", index));
     }
 
@@ -2329,7 +2485,7 @@
    */
   function prefetchPhotoMusicWindow(
     startIndex,
-    count = musicPhotoPreloadAhead,
+    count = getMusicPhotoPreloadAhead(),
   ) {
     if (
       !musicPlaylist.length ||
@@ -2340,7 +2496,7 @@
 
     const firstIndex = Math.max(0, Math.trunc(Number(startIndex) || 0));
     const preloadCount = Math.round(
-      configuredNumber(count, musicPhotoPreloadAhead, 0),
+      configuredNumber(count, getMusicPhotoPreloadAhead(), 0),
     );
     if (!preloadCount) return;
 
@@ -2397,7 +2553,7 @@
       musicPlaylist.forEach((track) => appendSource(track.src));
     }
 
-    const prioritySources = allSources.slice(0, musicPreloadAhead);
+    const prioritySources = allSources.slice(0, getMusicPreloadAhead());
     const remainingSources = musicCacheWholePlaylist
       ? [
           ...(anchorCue?.src ? [anchorCue.src] : []),
@@ -2495,7 +2651,9 @@
         video.muted = photo.muted !== false;
         video.defaultMuted = video.muted;
         video.loop = photo.loop !== false;
-        video.autoplay = photo.autoplay !== false;
+        video.autoplay = false;
+        video.dataset.autoplay = photo.autoplay !== false ? "true" : "false";
+        video.dataset.videoVisible = "false";
         video.playsInline = true;
         video.preload =
           typeof photo.preload === "string" ? photo.preload : "metadata";
@@ -2513,7 +2671,7 @@
           "loadeddata",
           () => {
             frame.classList.add("has-media", "has-video");
-            if (video.autoplay) video.play().catch(() => {});
+            updatePhotoVideoPlayback(video);
           },
           { once: true },
         );
@@ -2548,8 +2706,9 @@
         const thumbnailSource = getPhotoThumbnailSource(photo);
         const image = document.createElement("img");
         image.className = "photo-media photo-image";
-        image.loading = "eager";
+        image.loading = "lazy";
         image.decoding = "async";
+        image.fetchPriority = "low";
         image.draggable = false;
         image.alt = photo.alt || fallbackName;
         image.dataset.photoSrc = thumbnailSource;
@@ -2794,6 +2953,7 @@
     photoLightbox.classList.add("is-visible");
     photoLightbox.setAttribute("aria-hidden", "false");
     document.body.classList.add("lightbox-open");
+    refreshPhotoVideoPlayback();
     interactionStatus.textContent = lightboxSource
       ? mediaType === "video"
         ? "视频正在加载，照片流暂时停下；关闭后会继续流动。"
@@ -2864,6 +3024,7 @@
     photoTrack.classList.remove("is-paused");
     resetLightboxMedia();
     lightboxPlaceholder.hidden = false;
+    refreshPhotoVideoPlayback();
     interactionStatus.textContent = "照片流已经继续缓缓流动。";
 
     if (lightboxReturnTarget?.isConnected) {
@@ -2901,12 +3062,9 @@
     if (mouseHeads.childElementCount) return;
     const random = mulberry32(20260716);
     const colors = ["#6f484c", "#8c5559", "#b66768", "#d3837b", "#efb096"];
-    const rowCount = Math.round(
-      configuredNumber(effectsConfig.transitionHeadRows, 8, 1),
-    );
-    const columnCount = Math.round(
-      configuredNumber(effectsConfig.transitionHeadColumns, 12, 1),
-    );
+    const rowCount = getTransitionHeadRows();
+    const columnCount = getTransitionHeadColumns();
+    const delaySpreadMs = getTransitionHeadDelaySpreadMs();
 
     for (let row = 0; row < rowCount; row += 1) {
       for (let column = 0; column < columnCount; column += 1) {
@@ -2923,7 +3081,7 @@
         );
         head.style.setProperty("--size", `${56 + random() * 94}px`);
         head.style.setProperty("--rotate", `${-28 + random() * 56}deg`);
-        head.style.setProperty("--delay", `${random() * 760}ms`);
+        head.style.setProperty("--delay", `${random() * delaySpreadMs}ms`);
         head.style.setProperty(
           "--head-color",
           colors[Math.floor(random() * colors.length)],
@@ -2935,11 +3093,11 @@
 
   // 生成礼物场景背景星光。
   function createGiftSparkles() {
+    if (giftSparklesBuilt) return;
+    giftSparklesBuilt = true;
     const random = mulberry32(19961224);
     const colors = ["#ffe4a3", "#f6bc87", "#f7d6c6", "#fff8dc"];
-    const sparkleCount = Math.round(
-      configuredNumber(effectsConfig.giftSparkleCount, 34, 0),
-    );
+    const sparkleCount = getGiftSparkleCount();
     for (let index = 0; index < sparkleCount; index += 1) {
       const sparkle = document.createElement("span");
       sparkle.className = "sparkle";
@@ -2962,9 +3120,7 @@
     floatingHeartsCreated = true;
     const random = mulberry32(Date.now());
     const colors = ["#f6b2a2", "#e48081", "#ffd28d", "#fff1d1"];
-    const heartCount = Math.round(
-      configuredNumber(effectsConfig.finalFloatingHeartCount, 40, 0),
-    );
+    const heartCount = getFinalFloatingHeartCount();
     for (let index = 0; index < heartCount; index += 1) {
       const heart = document.createElement("span");
       heart.className = "floating-heart";
