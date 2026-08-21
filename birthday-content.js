@@ -362,7 +362,7 @@ window.BIRTHDAY_CONTENT = {
 
       // 【爱心树中央红心】
       // 进入爱心树页面后，点击画布中央的红心。
-      loveTreeHeart: 9,
+      loveTreeHeart: 8,
 
       // 【一起许愿】
       // 米老鼠出现后，点击“一起许愿”按钮。
@@ -389,6 +389,12 @@ window.BIRTHDAY_CONTENT = {
           track: "sakura-grass",
           start: "02:38",
           end: "04:30",
+        },
+
+        { //  "莫文蔚 - 慢慢喜欢你"
+          track: "slowly-fall-for-you",
+          start: "00:00",
+          end: "03:13",
         },
 
          // 1. 阿肆, 郭采洁 - 世界上的另一个我
@@ -433,12 +439,12 @@ window.BIRTHDAY_CONTENT = {
           end: null,
         },
 
-        // 7. 萧潇 - 爱要坦荡荡
-        {
-          track: "love-be-frank",
-          start: "00:15",
-          end: null,
-        },
+        // // 7. 萧潇 - 爱要坦荡荡
+        // {
+        //   track: "love-be-frank",
+        //   start: "00:15",
+        //   end: null,
+        // },
 
         // 8. 许嵩 - 有何不可
         {
