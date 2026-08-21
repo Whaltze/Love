@@ -1013,7 +1013,6 @@ body[data-phase="opening-caught"] {
   color: var(--head-color, #70464b);
   opacity: 0;
   transform: translate(-50%, -50%) rotate(var(--rotate)) scale(0);
-  will-change: transform, opacity;
 }
 
 .transition-head::before,
@@ -1044,6 +1043,7 @@ body[data-phase="opening-caught"] {
 }
 
 .mouse-transition.is-active .transition-head {
+  will-change: transform, opacity;
   animation: transition-head-pop var(--transition-head-pop-duration) var(--delay)
     cubic-bezier(0.17, 0.89, 0.32, 1.35) forwards;
 }

@@ -640,6 +640,7 @@
   let lastPetalAt = 0;
   let storyStarted = false;
   let storyAnimationId = 0;
+  let storyAnimationTimer = 0;
   let clockTimer = 0;
   let musicWanted = false;
   let activeMusicDeckIndex = -1;
@@ -1667,18 +1668,35 @@
     const characterDelay = reducedMotion
       ? 8
       : configuredNumber(storyConfig.characterDelayMs, 75, 8);
+    let lastRenderedCount = -1;
     const write = (now) => {
       const count = Math.min(
         storyCopy.length,
         Math.floor((now - startedAt) / characterDelay),
       );
-      storyText.replaceChildren(document.createTextNode(storyCopy.slice(0, count)));
+      if (count !== lastRenderedCount) {
+        lastRenderedCount = count;
+        storyText.replaceChildren(
+          document.createTextNode(storyCopy.slice(0, count)),
+        );
+        if (count < storyCopy.length) {
+          const cursor = document.createElement("span");
+          cursor.className = "type-cursor";
+          cursor.textContent = "_";
+          storyText.append(cursor);
+        }
+      }
+
       if (count < storyCopy.length) {
-        const cursor = document.createElement("span");
-        cursor.className = "type-cursor";
-        cursor.textContent = "_";
-        storyText.append(cursor);
-        storyAnimationId = requestAnimationFrame(write);
+        if (hasMobilePerformanceMode()) {
+          const nextCharacterAt = startedAt + (count + 1) * characterDelay;
+          storyAnimationTimer = window.setTimeout(() => {
+            storyAnimationTimer = 0;
+            storyAnimationId = requestAnimationFrame(write);
+          }, Math.max(8, nextCharacterAt - performance.now()));
+        } else {
+          storyAnimationId = requestAnimationFrame(write);
+        }
       } else if (!invitationScheduled) {
         invitationScheduled = true;
         const invitationDelay = configuredNumber(
@@ -2279,7 +2297,10 @@
       while (audioPrefetchQueue.length) {
         const job = audioPrefetchQueue.shift();
         if (!job) continue;
-        await waitForNonCriticalWork(job.priority === true);
+        if (nonCriticalWorkSuspended && job.priority !== true) {
+          audioPrefetchQueue.unshift(job);
+          break;
+        }
         pendingAudioPrefetchJobs.delete(job.url);
         try {
           await prefetchSingleMediaUrl(job.url, "audio");
@@ -4498,6 +4519,74 @@
     return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2);
   }
 
+  function getMobileDebugState() {
+    const layout = getMobileLayoutSnapshot();
+    const storyClientHeight = story?.clientHeight || 0;
+    const storyScrollHeight = story?.scrollHeight || 0;
+    const photoMedia = photoStreamBuilt
+      ? [...photoTrack.querySelectorAll(".photo-media")]
+      : [];
+    const inlineVideos = photoMedia.filter(
+      (media) => media instanceof HTMLVideoElement,
+    );
+
+    return {
+      active: isMobileExperience,
+      forcedMode: mobileForcedMode === null ? "auto" : mobileForcedMode,
+      debug: mobileDebugEnabled,
+      breakpointPx: mobileBreakpointPx,
+      viewport: {
+        width: window.innerWidth,
+        height: window.innerHeight,
+      },
+      layout: {
+        ...layout,
+        stageHeightPx: stage?.clientHeight || 0,
+        heartArtHeightPx: heartArt?.getBoundingClientRect().height || 0,
+      },
+      story: {
+        clientHeight: storyClientHeight,
+        scrollHeight: storyScrollHeight,
+        overflow: storyScrollHeight > storyClientHeight + 1,
+      },
+      performance: {
+        enabled: hasMobilePerformanceMode(),
+        initialPhotoCount: getPhotoInitialCount(),
+        photoLoadAheadScreens: getPhotoLoadAheadScreens(),
+        thumbnailBatchSize: getPhotoThumbnailBatchSize(),
+        previewNeighborCount: getPhotoPreviewNeighborCount(),
+        musicPreloadAhead: getMusicPreloadAhead(),
+        photoMusicPreloadAhead: getMusicPhotoPreloadAhead(),
+        treeBloomCount: getTreeBloomCount(),
+        treeTargetFps:
+          getTreeFrameIntervalMs() > 0
+            ? Math.round(1000 / getTreeFrameIntervalMs())
+            : 60,
+        transitionDurationScale: getMobileTransitionScale(),
+      },
+      loading: {
+        photoStreamBuilt,
+        loadedPhotoMedia: photoMedia.filter(
+          (media) => media.dataset.loaded === "true",
+        ).length,
+        pendingPhotoMedia: photoMedia.filter(
+          (media) => media.dataset.loaded !== "true",
+        ).length,
+        inlineVideosPlaying: inlineVideos.filter(
+          (video) => !video.paused,
+        ).length,
+        audioQueueLength: audioPrefetchQueue.length,
+        nonCriticalWorkSuspended,
+      },
+      support: {
+        requestIdleCallback:
+          typeof window.requestIdleCallback === "function",
+        intersectionObserver: "IntersectionObserver" in window,
+        serviceWorker: "serviceWorker" in navigator,
+      },
+    };
+  }
+
   window.__loveExperience = {
     get phase() {
       return phase;
@@ -4515,6 +4604,25 @@
     startPhotos: startMouseTransition,
     showGift: showGiftGuide,
     openGift: openGiftSequence,
+    mobile: Object.freeze({
+      getState: getMobileDebugState,
+      applyLayout: applyMobileLayoutOverrides,
+      resetLayout: resetMobileLayoutOverrides,
+      setDebug: setMobileDebug,
+      forceMode: forceMobileMode,
+      refresh() {
+        refreshMobileExperience();
+        return getMobileDebugState();
+      },
+      pauseLoading() {
+        setNonCriticalWorkSuspended(true);
+        return getMobileDebugState();
+      },
+      resumeLoading() {
+        setNonCriticalWorkSuspended(false);
+        return getMobileDebugState();
+      },
+    }),
   };
 
   window.addEventListener("pagehide", () => {
@@ -4522,8 +4630,18 @@
     window.clearInterval(clockTimer);
     window.clearInterval(synthTimer);
     window.clearTimeout(filmHintTimer);
+    window.clearTimeout(storyAnimationTimer);
+    window.clearTimeout(photoThumbnailWarmupTimer);
+    window.clearTimeout(musicPreloadTimer);
+    window.clearTimeout(musicPreloadAllTimer);
+    photoThumbnailWarmupGeneration += 1;
+    photoMediaObserver?.disconnect();
+    photoVideoPlaybackObserver?.disconnect();
+    mobileMediaQuery.removeEventListener?.("change", scheduleResponsiveRefresh);
+    document.removeEventListener("visibilitychange", refreshPhotoVideoPlayback);
     for (const timer of sceneTimers) window.clearTimeout(timer);
     sceneTimers.clear();
+    cancelAnimationFrame(mobileResizeFrame);
     cancelAnimationFrame(storyAnimationId);
   });
 })();

@@ -1109,7 +1109,7 @@ window.BIRTHDAY_CONTENT = {
     ],
     signature: "",
     finalWish: [
-      "愿你每一个愿望，都在未来被温柔接住。",
+      "愿你每一个愿望，都在未来被温柔接住。\n"+
       "回复礼物，即得贺礼！",
       ""
     ],
