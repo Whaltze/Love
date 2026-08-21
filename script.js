@@ -47,7 +47,10 @@
   const storyText = document.querySelector("#storyText");
   const clockBox = document.querySelector("#clockBox");
   const clock = document.querySelector("#clock");
-  const music = document.querySelector("#backgroundMusic");
+  const musicDecks = [
+    document.querySelector("#backgroundMusic"),
+    document.querySelector("#backgroundMusicAlt"),
+  ].filter(Boolean);
   const musicToggle = document.querySelector("#musicToggle");
   const interactionStatus = document.querySelector("#interactionStatus");
   const mainScene = document.querySelector("#main");
@@ -130,6 +133,7 @@
   const relationshipConfig = birthdayContent.relationship || {};
   const timingConfig = birthdayContent.timing || {};
   const effectsConfig = birthdayContent.effects || {};
+  const musicConfig = birthdayContent.music || {};
 
   /**
    * 统一读取数字配置：若用户误填文字或负数，则使用默认值。
@@ -139,6 +143,92 @@
     const number = Number(value);
     return Number.isFinite(number) ? Math.max(minimum, number) : fallback;
   }
+
+  // 音乐动作保留符号；在 birthday-content.js / music.actions 中直接使用。
+  const MUSIC_NEXT = "NEXT";
+  const MUSIC_CONTINUE = "CONTINUE";
+  const musicPlaylist = (Array.isArray(musicConfig.playlist)
+    ? musicConfig.playlist
+    : []
+  ).filter(
+    (track) => track && typeof track.src === "string" && track.src.trim(),
+  );
+  const musicActions =
+    musicConfig.actions && typeof musicConfig.actions === "object"
+      ? musicConfig.actions
+      : {};
+  const musicVolume = clamp(configuredNumber(musicConfig.volume, 0.52, 0));
+  const musicCrossfadeMs = configuredNumber(
+    musicConfig.crossfadeMs,
+    1400,
+    0,
+  );
+  const musicPauseFadeMs = configuredNumber(
+    musicConfig.pauseFadeMs,
+    480,
+    0,
+  );
+  const musicFragmentLoopFadeMs = configuredNumber(
+    musicConfig.fragmentLoopFadeMs,
+    900,
+    0,
+  );
+  const musicOpeningPlaybackConfig =
+    musicConfig.opening && typeof musicConfig.opening === "object"
+      ? musicConfig.opening
+      : {};
+  const musicOpeningAutoplay = musicOpeningPlaybackConfig.autoplay === true;
+  const musicOpeningAction = Object.prototype.hasOwnProperty.call(
+    musicOpeningPlaybackConfig,
+    "action",
+  )
+    ? musicOpeningPlaybackConfig.action
+    : 0;
+  const musicOpeningRetryOnInteraction =
+    musicOpeningPlaybackConfig.retryOnFirstInteraction !== false;
+  const musicOpeningFadeInMs = configuredNumber(
+    musicOpeningPlaybackConfig.fadeInMs,
+    musicCrossfadeMs,
+    0,
+  );
+  const musicDuckingConfig =
+    musicConfig.ducking && typeof musicConfig.ducking === "object"
+      ? musicConfig.ducking
+      : {};
+  const musicDuckingEnabled = musicDuckingConfig.enabled !== false;
+  const musicDuckVolumeRatio = clamp(
+    configuredNumber(musicDuckingConfig.volumeRatio, 0.22, 0),
+  );
+  const musicDuckFadeOutMs = configuredNumber(
+    musicDuckingConfig.fadeOutMs,
+    260,
+    0,
+  );
+  const musicDuckHoldMs = configuredNumber(
+    musicDuckingConfig.holdMs,
+    2000,
+    0,
+  );
+  const musicDuckFadeInMs = configuredNumber(
+    musicDuckingConfig.fadeInMs,
+    820,
+    0,
+  );
+  const musicDuckChimeHoldMs = configuredNumber(
+    musicDuckingConfig.chimeHoldMs,
+    musicDuckHoldMs,
+    0,
+  );
+  const musicDuckMickeyHoldMs = configuredNumber(
+    musicDuckingConfig.mickeyHoldMs,
+    musicDuckHoldMs,
+    0,
+  );
+  const musicDuckOnChime =
+    musicDuckingEnabled && musicDuckingConfig.onChime !== false;
+  const musicDuckOnMickeyAppear =
+    musicDuckingEnabled && musicDuckingConfig.onMickeyAppear !== false;
+  const SYNTH_MUSIC_VOLUME = 0.12;
 
   // 开场参数。减少动态效果的用户会自动得到更短的移动动画。
   const openingMoveEveryMs = configuredNumber(
@@ -279,10 +369,34 @@
   let storyAnimationId = 0;
   let clockTimer = 0;
   let musicWanted = false;
+  let activeMusicDeckIndex = -1;
+  let currentMusicCue = null;
+  let currentMusicTrackIndex = -1;
+  let musicSwitchToken = 0;
+  let musicFadeFrame = 0;
+  let musicFadeGeneration = 0;
+  let musicFadeResolve = null;
+  let musicMonitorFrame = 0;
+  let musicSwitching = false;
+  const musicActionCounts = Object.create(null);
+  const musicDeckCues = new WeakMap();
+  const musicDeckTokens = new WeakMap();
+  const musicDeckBaseVolumes = new WeakMap();
+  let musicSynthFallbackAllowed = true;
+  let musicDuckFactor = 1;
+  let musicDuckFrame = 0;
+  let musicDuckGeneration = 0;
+  let musicDuckResolve = null;
+  let musicDuckRestoreTimer = 0;
+  let musicDuckRequestGeneration = 0;
+  let openingMusicCue = null;
+  let openingMusicAwaitingInteraction = false;
+  let openingMusicRetryInstalled = false;
   let synthContext = null;
   let synthGain = null;
   let synthTimer = 0;
   let synthStep = 0;
+  let chimeContext = null;
   let invitationScheduled = false;
   let photoSceneStarted = false;
   let giftGuideShown = false;
@@ -320,6 +434,8 @@
   renderBirthdayCard();
   createGiftSparkles();
   drawIdle();
+  initializeMusicDecks();
+  exposeMusicInterface();
   startOpeningGate();
 
   // 爱心树红心的鼠标命中反馈；只有进入 idle 状态后才可点击。
@@ -333,29 +449,72 @@
   });
 
   canvas.addEventListener("click", (event) => {
-    if (phase === "idle" && isSeedHit(event)) startExperience();
+    if (phase !== "idle" || !isSeedHit(event)) return;
+    triggerMusicAction("loveTreeHeart");
+    startExperience();
   });
 
   canvas.addEventListener("keydown", (event) => {
     if (phase !== "idle") return;
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
+      triggerMusicAction("loveTreeHeart");
       startExperience();
     }
   });
 
   // 开场移动爱心：鼠标点击、触摸点击和键盘 Enter/空格都能成功进入。
-  catchHeart.addEventListener("click", unlockOpeningGate);
+  catchHeart.addEventListener("click", () => {
+    if (openingUnlocked || phase !== "opening") return;
+    triggerMusicAction("catchHeart", undefined, { forcePlay: true });
+    unlockOpeningGate();
+  });
 
-  // 各场景主要按钮。
-  wishButton.addEventListener("click", startMouseTransition);
-  finishPhotosButton.addEventListener("click", showGiftGuide);
-  acceptGiftButton.addEventListener("click", openGiftSequence);
-  giftBox.addEventListener("click", openGiftBox);
-  keepGiftButton.addEventListener("click", keepBirthdayGift);
-  closePhotoLightboxButton.addEventListener("click", closePhotoLightbox);
+  // 各场景主要按钮。只有真正生效的点击才会消费对应音乐动作。
+  wishButton.addEventListener("click", () => {
+    if (phase !== "invitation") return;
+    triggerMusicAction("wishButton");
+    startMouseTransition();
+  });
+  finishPhotosButton.addEventListener("click", () => {
+    if (phase !== "photos" || giftGuideShown) return;
+    triggerMusicAction("finishPhotosButton");
+    showGiftGuide();
+  });
+  acceptGiftButton.addEventListener("click", () => {
+    if (phase !== "gift-invitation") return;
+    triggerMusicAction("acceptGiftButton");
+    openGiftSequence();
+  });
+  giftBox.addEventListener("click", () => {
+    if (phase !== "gift" || giftOpened) return;
+    triggerMusicAction("giftBox");
+    openGiftBox();
+  });
+  keepGiftButton.addEventListener("click", () => {
+    if (
+      !birthdayCard.classList.contains("is-visible") ||
+      birthdayCard.classList.contains("is-kept")
+    ) {
+      return;
+    }
+    triggerMusicAction("keepGiftButton");
+    keepBirthdayGift();
+  });
+  closePhotoLightboxButton.addEventListener("click", () => {
+    if (!photoLightbox.classList.contains("is-visible")) return;
+    triggerMusicAction("photoLightboxClose");
+    closePhotoLightbox();
+  });
   photoLightbox.addEventListener("click", (event) => {
-    if (event.target === photoLightbox) closePhotoLightbox();
+    if (
+      event.target !== photoLightbox ||
+      !photoLightbox.classList.contains("is-visible")
+    ) {
+      return;
+    }
+    triggerMusicAction("photoLightboxClose");
+    closePhotoLightbox();
   });
   lightboxImage.addEventListener("error", showLightboxPlaceholder);
   lightboxVideo.addEventListener("error", showLightboxPlaceholder);
@@ -394,36 +553,25 @@
     if (phase === "opening") moveCatchHeart(true);
   });
 
-  // 背景音乐开关。
+  // 背景音乐开关：暂停时淡出；重新播放时默认延续当前片段。
   musicToggle.addEventListener("click", () => {
-    musicWanted = !musicWanted;
-    if (musicWanted) {
-      startMusic();
-    } else {
-      stopMusic();
-    }
-    updateMusicButton();
-  });
-
-  music.addEventListener("playing", () => {
-    if (!musicWanted) {
-      music.pause();
+    // 自动播放被拦截时，第一次点击音乐按钮应补播，而不是误判成“暂停”。
+    if (openingMusicAwaitingInteraction) {
+      retryOpeningMusicAfterInteraction();
       return;
     }
-    stopSynth();
-    updateMusicButton(true);
-  });
-
-  music.addEventListener("pause", () => {
-    if (!synthTimer) updateMusicButton(false);
+    if (musicWanted) {
+      stopMusic();
+      return;
+    }
+    triggerMusicAction("musicToggle", undefined, { forcePlay: true });
   });
 
   /**
-   * 不在页面刚打开时自动播放声音。
-   * 用户抓住开场爱心后，真实点击手势会启动音乐，更符合浏览器播放规则，
-   * 也与“请在安静环境，佩戴耳机为佳”的提示保持一致。
+   * 根据 music.opening.autoplay 在开场页立即尝试播放。
+   * 有声自动播放若被浏览器拦截，会在开场页第一次真实点击/按键时补播。
    */
-  updateMusicButton(false);
+  initializeOpeningMusicPlayback();
 
   /* =========================================================================
    * 0. 开场追逐爱心
@@ -552,9 +700,7 @@
     interactionStatus.textContent =
       "成功抓住爱心。开场正在淡出，即将进入爱心树。";
 
-    // 点击爱心属于真实用户手势，可可靠地启动浏览器音频。
-    musicWanted = true;
-    startMusic();
+    // 点击音频动作已在事件入口触发；这里仅播放不影响背景音乐的提示音。
     playChime([523.25, 659.25, 783.99]);
 
     scheduleScene(() => {
@@ -583,9 +729,6 @@
   function startExperience() {
     if (phase !== "idle") return;
     setPhase("animating");
-    musicWanted = true;
-    startMusic();
-    updateMusicButton();
     canvas.classList.remove("is-clickable");
     canvas.setAttribute("aria-label", "爱心树正在生长");
     interactionStatus.textContent = "红心已被点击，爱心树正在生长。";
@@ -945,6 +1088,7 @@
   function showMouseInvitation() {
     if (phase !== "complete") return;
     setPhase("invitation");
+    duckForMickeyAppearance();
     mouseIntro.classList.add("is-visible");
     mouseIntro.setAttribute("aria-hidden", "false");
     interactionStatus.textContent =
@@ -960,7 +1104,11 @@
   function startMouseTransition() {
     if (phase !== "invitation") return;
     setPhase("transition");
-    playChime([523.25, 659.25, 783.99]);
+    duckForMickeyAppearance();
+    playChime([523.25, 659.25, 783.99], {
+      // 米老鼠铺屏已单独触发压低；关闭这里的重复请求，避免较短时长覆盖它。
+      duck: !musicDuckOnMickeyAppear,
+    });
     createTransitionHeads();
     mouseIntro.classList.remove("is-visible");
     mouseIntro.setAttribute("aria-hidden", "true");
@@ -1029,6 +1177,7 @@
     }
     giftGuideShown = true;
     setPhase("gift-invitation");
+    duckForMickeyAppearance();
     finishPhotosButton.classList.remove("is-visible");
     finishPhotosButton.setAttribute("aria-hidden", "true");
     finishPhotosButton.tabIndex = -1;
@@ -1443,6 +1592,9 @@
   function openPhotoLightbox(photo, index, trigger) {
     if (!photoScene.classList.contains("is-active")) return;
 
+    // photoCard 可配置为 NEXT、CONTINUE、单个片段或按照片序号排列的数组。
+    triggerMusicAction("photoCard", index);
+
     const source = typeof photo.src === "string" ? photo.src.trim() : "";
     const mediaType = getPhotoMediaType(photo, source);
     lightboxReturnTarget = trigger;
@@ -1639,21 +1791,36 @@
     return timer;
   }
 
-  // 播放一次性的轻柔提示音；不影响背景音乐。
-  async function playChime(frequencies) {
+  // 播放一次性的轻柔提示音；使用独立 AudioContext，不会被背景音乐备用旋律打断。
+  async function playChime(frequencies, options = {}) {
     const AudioContext = window.AudioContext || window.webkitAudioContext;
     if (!AudioContext) return;
+
+    // 原提示音完整保留，只在它响起前柔和压低背景歌曲。
+    if (musicDuckOnChime && options.duck !== false) {
+      const customDuck =
+        options.duck && typeof options.duck === "object" ? options.duck : {};
+      duckBackgroundMusic({
+        ...customDuck,
+        holdMs: configuredNumber(
+          customDuck.holdMs ?? options.duckHoldMs,
+          musicDuckChimeHoldMs,
+          0,
+        ),
+      });
+    }
+
     try {
-      synthContext ||= new AudioContext();
-      if (synthContext.state === "suspended") await synthContext.resume();
-      const master = synthContext.createGain();
+      chimeContext ||= new AudioContext();
+      if (chimeContext.state === "suspended") await chimeContext.resume();
+      const master = chimeContext.createGain();
       master.gain.value = 0.12;
-      master.connect(synthContext.destination);
-      const now = synthContext.currentTime;
+      master.connect(chimeContext.destination);
+      const now = chimeContext.currentTime;
 
       frequencies.forEach((frequency, index) => {
-        const oscillator = synthContext.createOscillator();
-        const gain = synthContext.createGain();
+        const oscillator = chimeContext.createOscillator();
+        const gain = chimeContext.createGain();
         const startsAt = now + index * 0.11;
         oscillator.type = "sine";
         oscillator.frequency.value = frequency;
@@ -1666,7 +1833,7 @@
         oscillator.stop(startsAt + 0.8);
       });
     } catch {
-      // Sound decoration is optional; the visual interaction should continue.
+      // 提示音只是装饰；失败时仍继续视觉交互。
     }
   }
 
@@ -1704,88 +1871,1211 @@
     return onHeart || onLabel;
   }
 
-  // 优先播放远程 MP3；加载失败时自动使用 Web Audio 备用旋律。
-  async function startMusic() {
+  /* =========================================================================
+   * 本地音乐管理器
+   * =========================================================================
+   * 两个 audio 元素交替工作：新片段从 0 音量开始，旧片段同步淡出。
+   * 歌单顺序、默认片段和每次点击的动作全部在 birthday-content.js 中配置。
+   */
+
+  function initializeMusicDecks() {
+    musicDecks.forEach((deck, index) => {
+      deck.preload = "auto";
+      deck.loop = false;
+      musicDeckBaseVolumes.set(deck, 0);
+      deck.volume = 0;
+      deck.setAttribute("playsinline", "");
+      musicDeckCues.set(deck, null);
+      musicDeckTokens.set(deck, 0);
+
+      // 成功开始真实音频后，取消“首个操作补播”的监听，避免重新定位片段。
+      deck.addEventListener("playing", confirmOpeningMusicPlayback);
+
+      // requestAnimationFrame 在后台标签页可能暂停，ended 事件作为片段循环兜底。
+      deck.addEventListener("ended", () => {
+        if (
+          !musicWanted ||
+          musicSwitching ||
+          index !== activeMusicDeckIndex
+        ) {
+          return;
+        }
+        const cue = musicDeckCues.get(deck) || currentMusicCue;
+        if (cue) {
+          switchToMusicCue(cue, {
+            durationMs: musicFragmentLoopFadeMs,
+            fragmentLoop: true,
+          });
+        }
+      });
+
+      deck.addEventListener("error", () => {
+        if (!musicWanted) return;
+        const isCurrentDeck =
+          index === activeMusicDeckIndex ||
+          musicDeckTokens.get(deck) === musicSwitchToken;
+        if (isCurrentDeck && !hasPlayingMusicDeck()) startSynth();
+      });
+    });
+  }
+
+  /**
+   * 在“先抓住这颗心”页面尝试播放配置的片段。
+   * 浏览器允许时会立即播放；若被自动播放策略拦截，则等待第一次真实操作补播。
+   */
+  function initializeOpeningMusicPlayback() {
+    updateMusicButton(false);
+    if (!musicOpeningAutoplay || !musicPlaylist.length) return;
+
+    openingMusicCue = resolveMusicCue(musicOpeningAction);
+    if (!openingMusicCue) return;
+    setCurrentMusicCue(openingMusicCue);
+
+    if (musicOpeningRetryOnInteraction) {
+      openingMusicAwaitingInteraction = true;
+      installOpeningMusicRetry();
+    }
+
+    switchToMusicCue(openingMusicCue, {
+      forcePlay: true,
+      allowSynthFallback: false,
+      durationMs: musicOpeningFadeInMs,
+    }).then(() => {
+      if (hasPlayingMusicDeck()) {
+        confirmOpeningMusicPlayback();
+      } else if (!musicOpeningRetryOnInteraction) {
+        musicWanted = false;
+        updateMusicButton(false);
+      }
+    });
+  }
+
+  function installOpeningMusicRetry() {
+    if (openingMusicRetryInstalled) return;
+    openingMusicRetryInstalled = true;
+    document.addEventListener("pointerdown", handleOpeningMusicInteraction, true);
+    document.addEventListener("keydown", handleOpeningMusicInteraction, true);
+  }
+
+  function removeOpeningMusicRetry() {
+    if (!openingMusicRetryInstalled) return;
+    openingMusicRetryInstalled = false;
+    document.removeEventListener("pointerdown", handleOpeningMusicInteraction, true);
+    document.removeEventListener("keydown", handleOpeningMusicInteraction, true);
+  }
+
+  function handleOpeningMusicInteraction(event) {
+    if (!openingMusicAwaitingInteraction) {
+      removeOpeningMusicRetry();
+      return;
+    }
+    if (
+      event.type === "keydown" &&
+      (event.repeat || (event.key !== "Enter" && event.key !== " "))
+    ) {
+      return;
+    }
+
+    // 自动播放其实已成功时不再重载片段；后续 click 会按原按钮语义正常执行。
+    if (hasPlayingMusicDeck()) {
+      confirmOpeningMusicPlayback();
+      return;
+    }
+
+    // 音乐按钮自己的 click 处理补播，避免 pointerdown 先播放、click 又立刻暂停。
+    const target = event.target;
+    if (target instanceof Element && musicToggle?.contains(target)) return;
+    retryOpeningMusicAfterInteraction();
+  }
+
+  function retryOpeningMusicAfterInteraction() {
+    if (!openingMusicAwaitingInteraction) {
+      return applyMusicAction(MUSIC_CONTINUE, { forcePlay: true });
+    }
+
+    openingMusicAwaitingInteraction = false;
+    removeOpeningMusicRetry();
+    musicSynthFallbackAllowed = true;
+    const cue = openingMusicCue || currentMusicCue || resolveMusicCue(0);
+    if (cue) {
+      setCurrentMusicCue(cue);
+      return switchToMusicCue(cue, {
+        forcePlay: true,
+        allowSynthFallback: true,
+        durationMs: musicOpeningFadeInMs,
+      });
+    }
+
     musicWanted = true;
-    // Start the local Web Audio melody inside the user gesture so sound works
-    // even when the original remote MP3 is slow, unavailable, or mixed-content
-    // blocked on an HTTPS deployment. It stops as soon as the MP3 begins.
     startSynth();
     updateMusicButton(true);
+    return Promise.resolve(null);
+  }
 
-    try {
-      await music.play();
-      if (musicWanted) {
-        stopSynth();
-        updateMusicButton(true);
-      } else {
-        music.pause();
+  function confirmOpeningMusicPlayback() {
+    if (!openingMusicAwaitingInteraction) return;
+    openingMusicAwaitingInteraction = false;
+    musicSynthFallbackAllowed = true;
+    removeOpeningMusicRetry();
+  }
+
+  function cancelOpeningMusicRetry() {
+    openingMusicAwaitingInteraction = false;
+    removeOpeningMusicRetry();
+  }
+
+  // 米老鼠真正进入画面时使用独立接口压低音乐，不新增或删除原有提示音。
+  function duckForMickeyAppearance() {
+    if (!musicDuckOnMickeyAppear) return Promise.resolve(false);
+    return duckBackgroundMusic({ holdMs: musicDuckMickeyHoldMs });
+  }
+
+  /**
+   * 暂时压低背景音乐，但不暂停、不改变歌曲时间。
+   * options 支持 volumeRatio、fadeOutMs、holdMs、fadeInMs；直接传数字时代表 holdMs。
+   */
+  function duckBackgroundMusic(options = {}) {
+    const normalizedOptions =
+      typeof options === "number" ? { holdMs: options } : options || {};
+    if (!musicDuckingEnabled && normalizedOptions.force !== true) {
+      return Promise.resolve(false);
+    }
+
+    const ratio = clamp(
+      configuredNumber(
+        normalizedOptions.volumeRatio,
+        musicDuckVolumeRatio,
+        0,
+      ),
+    );
+    const fadeOutMs = configuredNumber(
+      normalizedOptions.fadeOutMs,
+      musicDuckFadeOutMs,
+      0,
+    );
+    const holdMs = configuredNumber(
+      normalizedOptions.holdMs,
+      musicDuckHoldMs,
+      0,
+    );
+    const fadeInMs = configuredNumber(
+      normalizedOptions.fadeInMs,
+      musicDuckFadeInMs,
+      0,
+    );
+    const requestGeneration = ++musicDuckRequestGeneration;
+    if (musicDuckRestoreTimer) window.clearTimeout(musicDuckRestoreTimer);
+    musicDuckRestoreTimer = 0;
+
+    // 连续提示音只会继续压低或延长保持时间，不会意外把声音提前抬高。
+    const targetFactor = Math.min(musicDuckFactor, ratio);
+    return fadeMusicDuckFactor(targetFactor, fadeOutMs).then((completed) => {
+      if (!completed || requestGeneration !== musicDuckRequestGeneration) {
+        return false;
       }
-    } catch {
-      if (musicWanted) {
+      musicDuckRestoreTimer = window.setTimeout(() => {
+        if (requestGeneration !== musicDuckRequestGeneration) return;
+        restoreBackgroundMusicVolume({ fadeInMs });
+      }, holdMs);
+      return true;
+    });
+  }
+
+  function restoreBackgroundMusicVolume(options = {}) {
+    const normalizedOptions =
+      typeof options === "number" ? { fadeInMs: options } : options || {};
+    const fadeInMs = configuredNumber(
+      normalizedOptions.fadeInMs,
+      musicDuckFadeInMs,
+      0,
+    );
+    ++musicDuckRequestGeneration;
+    if (musicDuckRestoreTimer) window.clearTimeout(musicDuckRestoreTimer);
+    musicDuckRestoreTimer = 0;
+    return fadeMusicDuckFactor(1, fadeInMs);
+  }
+
+  function fadeMusicDuckFactor(target, duration) {
+    cancelMusicDuckFade();
+    const generation = musicDuckGeneration;
+    const from = musicDuckFactor;
+    const to = clamp(target);
+    const fadeDuration = getMusicFadeDuration(duration);
+
+    if (fadeDuration <= 0 || Math.abs(from - to) < 0.001) {
+      setMusicDuckFactor(to);
+      return Promise.resolve(true);
+    }
+
+    return new Promise((resolve) => {
+      const startedAt = performance.now();
+      musicDuckResolve = resolve;
+
+      const step = (now) => {
+        if (generation !== musicDuckGeneration) return;
+        const progress = clamp((now - startedAt) / fadeDuration);
+        setMusicDuckFactor(lerp(from, to, easeInOutCubic(progress)));
+        if (progress >= 1) {
+          musicDuckFrame = 0;
+          musicDuckResolve = null;
+          resolve(true);
+          return;
+        }
+        musicDuckFrame = window.requestAnimationFrame(step);
+      };
+
+      musicDuckFrame = window.requestAnimationFrame(step);
+    });
+  }
+
+  function cancelMusicDuckFade() {
+    musicDuckGeneration += 1;
+    if (musicDuckFrame) window.cancelAnimationFrame(musicDuckFrame);
+    musicDuckFrame = 0;
+    if (musicDuckResolve) {
+      const resolve = musicDuckResolve;
+      musicDuckResolve = null;
+      resolve(false);
+    }
+  }
+
+  function setMusicDuckFactor(value) {
+    musicDuckFactor = clamp(value);
+    applyMusicOutputVolumes();
+  }
+
+  function getMusicDeckBaseVolume(deck) {
+    const volume = musicDeckBaseVolumes.get(deck);
+    return Number.isFinite(volume) ? clamp(volume) : 0;
+  }
+
+  function setMusicDeckBaseVolume(deck, volume) {
+    if (!deck) return;
+    musicDeckBaseVolumes.set(deck, clamp(volume));
+    deck.volume = clamp(getMusicDeckBaseVolume(deck) * musicDuckFactor);
+  }
+
+  function applyMusicOutputVolumes() {
+    musicDecks.forEach((deck) => {
+      deck.volume = clamp(getMusicDeckBaseVolume(deck) * musicDuckFactor);
+    });
+    if (synthGain) {
+      synthGain.gain.value = SYNTH_MUSIC_VOLUME * musicDuckFactor;
+    }
+  }
+
+  function exposeMusicInterface() {
+    window.BIRTHDAY_MUSIC = Object.freeze({
+      NEXT: MUSIC_NEXT,
+      CONTINUE: MUSIC_CONTINUE,
+
+      // 按 birthday-content.js / music.actions 中的动作名执行。
+      trigger(actionName, sequenceIndex, options = {}) {
+        return triggerMusicAction(actionName, sequenceIndex, options);
+      },
+
+      // 直接执行 NEXT、CONTINUE、歌单编号或 { track, start, end }。
+      play(action = MUSIC_CONTINUE) {
+        return applyMusicAction(action, { forcePlay: true });
+      },
+
+      next() {
+        return applyMusicAction(MUSIC_NEXT, { forcePlay: true });
+      },
+
+      continueCurrent() {
+        return applyMusicAction(MUSIC_CONTINUE, { forcePlay: true });
+      },
+
+      select(track, start, end) {
+        const action =
+          track && typeof track === "object"
+            ? track
+            : { track, start, end };
+        return applyMusicAction(action, { forcePlay: true });
+      },
+
+      // 临时压低歌曲，不暂停播放。可传毫秒数或 { volumeRatio, fadeOutMs, holdMs, fadeInMs }。
+      duck(options = {}) {
+        return duckBackgroundMusic(options);
+      },
+
+      // 提前恢复正常背景音量；可传恢复时长或 { fadeInMs }。
+      restoreVolume(options = {}) {
+        return restoreBackgroundMusicVolume(options);
+      },
+
+      pause() {
+        return stopMusic();
+      },
+
+      getState() {
+        const deck = musicDecks[activeMusicDeckIndex] || null;
+        const activeCue = deck ? musicDeckCues.get(deck) : null;
+        return {
+          wanted: musicWanted,
+          playing:
+            musicWanted &&
+            (Boolean(synthTimer) ||
+              musicSwitching ||
+              musicDecks.some((item) => !item.paused && !item.ended)),
+          switching: musicSwitching,
+          openingRetryPending: openingMusicAwaitingInteraction,
+          ducked: musicDuckFactor < 0.999,
+          duckFactor: musicDuckFactor,
+          trackIndex: currentMusicTrackIndex,
+          cue: currentMusicCue ? { ...currentMusicCue } : null,
+          activeCue: activeCue ? { ...activeCue } : null,
+          currentTime: deck && Number.isFinite(deck.currentTime)
+            ? deck.currentTime
+            : 0,
+          playlist: musicPlaylist.map((track, index) => ({
+            index,
+            id: track.id || "",
+            title: track.title || "",
+            src: track.src,
+            start: track.start ?? 0,
+            end: track.end ?? null,
+          })),
+        };
+      },
+    });
+  }
+
+  function triggerMusicAction(actionName, sequenceIndex, options = {}) {
+    const hasConfiguredAction = Object.prototype.hasOwnProperty.call(
+      musicActions,
+      actionName,
+    );
+    let action = hasConfiguredAction ? musicActions[actionName] : MUSIC_NEXT;
+
+    if (Array.isArray(action)) {
+      if (!action.length) {
+        action = MUSIC_CONTINUE;
+      } else {
+        let actionIndex;
+        const suppliedIndex = Number(sequenceIndex);
+        if (Number.isFinite(suppliedIndex)) {
+          actionIndex = Math.trunc(suppliedIndex);
+        } else {
+          actionIndex = musicActionCounts[actionName] || 0;
+          musicActionCounts[actionName] = actionIndex + 1;
+        }
+        action = action[positiveModulo(actionIndex, action.length)];
+      }
+    }
+
+    return applyMusicAction(action, options);
+  }
+
+  function applyMusicAction(action, options = {}) {
+    musicSynthFallbackAllowed = options.allowSynthFallback !== false;
+    const normalizedSymbol =
+      typeof action === "string" ? action.trim().toUpperCase() : "";
+
+    if (normalizedSymbol === MUSIC_CONTINUE) {
+      if (!currentMusicCue) {
+        const initialIndex = currentMusicTrackIndex >= 0
+          ? currentMusicTrackIndex
+          : 0;
+        const initialCue = resolveMusicCue(initialIndex);
+        if (initialCue) setCurrentMusicCue(initialCue);
+      }
+
+      if (options.forcePlay) musicWanted = true;
+      if (musicWanted) return continueCurrentMusic(options);
+      updateMusicButton(false);
+      return Promise.resolve(currentMusicCue);
+    }
+
+    const cue = resolveMusicCue(action);
+    if (!cue) {
+      if (options.forcePlay) {
+        musicWanted = true;
         startSynth();
         updateMusicButton(true);
       }
+      return Promise.resolve(null);
     }
+
+    setCurrentMusicCue(cue);
+    if (options.forcePlay) musicWanted = true;
+
+    // 手动暂停后，普通页面点击仍可改变“下一次要播放的片段”，但不会擅自开声。
+    if (!musicWanted) {
+      ++musicSwitchToken;
+      musicSwitching = false;
+      stopMusicMonitor();
+      cancelMusicFade();
+      musicDecks.forEach((deck) => {
+        deck.pause();
+        setMusicDeckBaseVolume(deck, 0);
+      });
+      stopSynth();
+      updateMusicButton(false);
+      return Promise.resolve(cue);
+    }
+
+    return switchToMusicCue(cue, options);
+  }
+
+  function resolveMusicCue(action) {
+    if (!musicPlaylist.length) return null;
+
+    let trackReference = action;
+    let customStart;
+    let customEnd;
+    let hasCustomStart = false;
+    let hasCustomEnd = false;
+
+    if (action && typeof action === "object" && !Array.isArray(action)) {
+      if (Object.prototype.hasOwnProperty.call(action, "track")) {
+        trackReference = action.track;
+      } else if (Object.prototype.hasOwnProperty.call(action, "trackIndex")) {
+        trackReference = action.trackIndex;
+      } else if (Object.prototype.hasOwnProperty.call(action, "index")) {
+        trackReference = action.index;
+      } else if (Object.prototype.hasOwnProperty.call(action, "id")) {
+        trackReference = action.id;
+      } else if (Object.prototype.hasOwnProperty.call(action, "title")) {
+        trackReference = action.title;
+      } else {
+        trackReference = currentMusicTrackIndex >= 0
+          ? currentMusicTrackIndex
+          : 0;
+      }
+
+      hasCustomStart = Object.prototype.hasOwnProperty.call(action, "start");
+      hasCustomEnd = Object.prototype.hasOwnProperty.call(action, "end");
+      customStart = action.start;
+      customEnd = action.end;
+    }
+
+    if (typeof trackReference === "string") {
+      const symbol = trackReference.trim().toUpperCase();
+      if (symbol === MUSIC_NEXT) {
+        trackReference = currentMusicTrackIndex >= 0
+          ? currentMusicTrackIndex + 1
+          : 0;
+      } else if (symbol === MUSIC_CONTINUE) {
+        return currentMusicCue || resolveMusicCue(
+          currentMusicTrackIndex >= 0 ? currentMusicTrackIndex : 0,
+        );
+      }
+    }
+
+    const trackIndex = resolveTrackIndex(trackReference);
+    if (trackIndex < 0) return null;
+    const track = musicPlaylist[trackIndex];
+    const start = parseMusicTime(
+      hasCustomStart ? customStart : track.start,
+      0,
+    );
+    const end = parseMusicTime(
+      hasCustomEnd ? customEnd : track.end,
+      null,
+    );
+
+    return createMusicCue(trackIndex, start, end);
+  }
+
+  function resolveTrackIndex(reference) {
+    if (!musicPlaylist.length) return -1;
+
+    if (typeof reference === "number" && Number.isFinite(reference)) {
+      return positiveModulo(Math.trunc(reference), musicPlaylist.length);
+    }
+
+    if (typeof reference === "string") {
+      const value = reference.trim();
+      if (!value) return currentMusicTrackIndex >= 0
+        ? currentMusicTrackIndex
+        : 0;
+
+      const numericValue = Number(value);
+      if (Number.isFinite(numericValue)) {
+        return positiveModulo(Math.trunc(numericValue), musicPlaylist.length);
+      }
+
+      const lowered = value.toLocaleLowerCase();
+      const matchedIndex = musicPlaylist.findIndex((track) =>
+        [track.id, track.title, track.src]
+          .filter((item) => typeof item === "string")
+          .some((item) => item.trim().toLocaleLowerCase() === lowered),
+      );
+      if (matchedIndex >= 0) return matchedIndex;
+    }
+
+    if (reference == null) {
+      return currentMusicTrackIndex >= 0 ? currentMusicTrackIndex : 0;
+    }
+
+    // 配置拼写有误时仍按 NEXT 前进，避免一次点击完全没有声音反馈。
+    return currentMusicTrackIndex >= 0
+      ? positiveModulo(currentMusicTrackIndex + 1, musicPlaylist.length)
+      : 0;
+  }
+
+  function parseMusicTime(value, fallback = 0) {
+    if (value == null || value === "") return fallback;
+    if (typeof value === "number") {
+      return Number.isFinite(value) ? Math.max(0, value) : fallback;
+    }
+    if (typeof value !== "string") return fallback;
+
+    const trimmed = value.trim();
+    if (!trimmed) return fallback;
+    if (!trimmed.includes(":")) {
+      const seconds = Number(trimmed);
+      return Number.isFinite(seconds) ? Math.max(0, seconds) : fallback;
+    }
+
+    const parts = trimmed.split(":").map(Number);
+    if (
+      parts.length < 2 ||
+      parts.length > 3 ||
+      parts.some((part) => !Number.isFinite(part) || part < 0)
+    ) {
+      return fallback;
+    }
+
+    return parts.reduce((seconds, part) => seconds * 60 + part, 0);
+  }
+
+  function positiveModulo(value, length) {
+    return ((value % length) + length) % length;
+  }
+
+  function createMusicCue(trackIndex, start, end) {
+    const track = musicPlaylist[trackIndex];
+    const safeStart = Number.isFinite(start) ? Math.max(0, start) : 0;
+    const safeEnd = Number.isFinite(end) ? Math.max(0, end) : null;
+    const cue = {
+      trackIndex,
+      id: typeof track.id === "string" ? track.id : "",
+      title:
+        typeof track.title === "string" && track.title.trim()
+          ? track.title.trim()
+          : "歌曲 " + (trackIndex + 1),
+      src: track.src.trim(),
+      start: safeStart,
+      end: safeEnd,
+    };
+    cue.key = getMusicCueKey(cue);
+    return cue;
+  }
+
+  function getMusicCueKey(cue) {
+    const end = Number.isFinite(cue.end) ? cue.end.toFixed(3) : "END";
+    return [
+      cue.trackIndex,
+      cue.src,
+      cue.start.toFixed(3),
+      end,
+    ].join("|");
+  }
+
+  function setCurrentMusicCue(cue) {
+    currentMusicCue = cue;
+    currentMusicTrackIndex = cue ? cue.trackIndex : -1;
+  }
+
+  function normalizeMusicCueForDuration(cue, duration) {
+    const hasDuration = Number.isFinite(duration) && duration > 0;
+    let start = Number.isFinite(cue.start) ? Math.max(0, cue.start) : 0;
+    let end = Number.isFinite(cue.end) ? Math.max(0, cue.end) : null;
+
+    if (hasDuration) {
+      start = Math.min(start, Math.max(0, duration - 0.25));
+      end = end == null ? duration : Math.min(end, duration);
+      if (end <= start + 0.18) {
+        start = Math.max(0, Math.min(start, duration - 1));
+        end = duration;
+      }
+    } else if (end != null && end <= start + 0.05) {
+      end = null;
+    }
+
+    const normalized = { ...cue, start, end };
+    normalized.key = getMusicCueKey(normalized);
+    return normalized;
+  }
+
+  function switchToMusicCue(cue, options = {}) {
+    musicSynthFallbackAllowed = options.allowSynthFallback !== false;
+    if (!cue || !musicDecks.length) {
+      if (musicWanted) startSynth();
+      return Promise.resolve(null);
+    }
+
+    setCurrentMusicCue(cue);
+    if (options.forcePlay) musicWanted = true;
+    if (!musicWanted) return Promise.resolve(cue);
+
+    const token = ++musicSwitchToken;
+    const previousActiveIndex = activeMusicDeckIndex;
+    const hadPlayingDeck = hasPlayingMusicDeck();
+    musicSwitching = true;
+    stopMusicMonitor();
+    cancelMusicFade();
+
+    let targetIndex = 0;
+    if (previousActiveIndex >= 0 && musicDecks.length > 1) {
+      const candidates = musicDecks
+        .map((deck, index) => ({ deck, index }))
+        .filter(({ index }) => index !== previousActiveIndex)
+        .sort(
+          (left, right) =>
+            getMusicDeckBaseVolume(left.deck) -
+            getMusicDeckBaseVolume(right.deck),
+        );
+      targetIndex = candidates[0]?.index ?? 0;
+    }
+
+    const targetDeck = musicDecks[targetIndex];
+    musicDeckTokens.set(targetDeck, token);
+    musicDeckCues.set(targetDeck, cue);
+    targetDeck.pause();
+    targetDeck.loop = false;
+    setMusicDeckBaseVolume(targetDeck, 0);
+    targetDeck.src = cue.src;
+    targetDeck.load();
+
+    // 这一行必须在真实点击调用栈内执行，以通过手机和桌面浏览器的播放策略。
+    const firstPlayAttempt = requestMusicDeckPlay(targetDeck);
+    if (!hadPlayingDeck) startSynth();
+    updateMusicButton(true);
+
+    return finishMusicSwitch({
+      token,
+      cue,
+      targetDeck,
+      targetIndex,
+      previousActiveIndex,
+      firstPlayAttempt,
+      durationMs:
+        options.durationMs == null
+          ? musicCrossfadeMs
+          : configuredNumber(options.durationMs, musicCrossfadeMs, 0),
+    });
+  }
+
+  async function finishMusicSwitch({
+    token,
+    cue,
+    targetDeck,
+    targetIndex,
+    previousActiveIndex,
+    firstPlayAttempt,
+    durationMs,
+  }) {
+    const metadataReady = await waitForMusicMetadata(targetDeck);
+    if (!isCurrentMusicOperation(token, targetDeck)) return null;
+    if (!metadataReady) {
+      return recoverFromMusicSwitchFailure(
+        token,
+        targetDeck,
+        previousActiveIndex,
+      );
+    }
+
+    const normalizedCue = normalizeMusicCueForDuration(
+      cue,
+      targetDeck.duration,
+    );
+    musicDeckCues.set(targetDeck, normalizedCue);
+    setCurrentMusicCue(normalizedCue);
+    setMusicDeckTime(targetDeck, normalizedCue.start);
+
+    let didPlay = await waitForMusicPromise(firstPlayAttempt, 12000, false);
+    if (!isCurrentMusicOperation(token, targetDeck)) return null;
+
+    // 某些浏览器在 load 后第一次 play 会以 AbortError 结束；在完成定位后再补一次。
+    if (!didPlay || targetDeck.paused) {
+      didPlay = await waitForMusicPromise(
+        requestMusicDeckPlay(targetDeck),
+        8000,
+        false,
+      );
+    }
+    if (!isCurrentMusicOperation(token, targetDeck)) return null;
+    if (!didPlay) {
+      return recoverFromMusicSwitchFailure(
+        token,
+        targetDeck,
+        previousActiveIndex,
+      );
+    }
+
+    // play() 必须在真实点击调用栈内尽早发起；部分浏览器会在它真正开始时
+    // 把元数据就绪后设置的 currentTime 重置为 0。本地预览服务器若不支持
+    // HTTP Range，也可能要等更多数据到达后才能 seek，因此在淡入前短暂重试定位。
+    await positionMusicDeckAtCueStart(targetDeck, normalizedCue.start, token);
+    if (!isCurrentMusicOperation(token, targetDeck)) return null;
+
+    const targets = musicDecks.map((deck, index) => ({
+      deck,
+      volume: index === targetIndex ? musicVolume : 0,
+    }));
+    const fadePromise = fadeMusicDecks(targets, durationMs);
+    stopSynth();
+    const completed = await fadePromise;
+
+    if (
+      !completed ||
+      !isCurrentMusicOperation(token, targetDeck) ||
+      !musicWanted
+    ) {
+      return null;
+    }
+
+    musicDecks.forEach((deck, index) => {
+      if (index !== targetIndex) {
+        deck.pause();
+        setMusicDeckBaseVolume(deck, 0);
+      }
+    });
+    setMusicDeckBaseVolume(targetDeck, musicVolume);
+    activeMusicDeckIndex = targetIndex;
+    musicSwitching = false;
+    setCurrentMusicCue(normalizedCue);
+    startMusicMonitor();
+    updateMusicButton(true);
+    return normalizedCue;
+  }
+
+  async function recoverFromMusicSwitchFailure(
+    token,
+    failedDeck,
+    previousActiveIndex,
+  ) {
+    if (!isCurrentMusicOperation(token, failedDeck)) return null;
+    failedDeck.pause();
+    setMusicDeckBaseVolume(failedDeck, 0);
+    musicSwitching = false;
+
+    const previousDeck = musicDecks[previousActiveIndex] || null;
+    const previousCue = previousDeck
+      ? musicDeckCues.get(previousDeck)
+      : null;
+    const canKeepPrevious =
+      previousDeck &&
+      previousCue &&
+      !previousDeck.error &&
+      !previousDeck.ended;
+
+    if (canKeepPrevious) {
+      if (previousDeck.paused) requestMusicDeckPlay(previousDeck);
+      activeMusicDeckIndex = previousActiveIndex;
+      setCurrentMusicCue(previousCue);
+      const targets = musicDecks.map((deck) => ({
+        deck,
+        volume: deck === previousDeck ? musicVolume : 0,
+      }));
+      await fadeMusicDecks(targets, Math.min(musicPauseFadeMs, 320));
+      if (token !== musicSwitchToken || !musicWanted) return null;
+      stopSynth();
+      startMusicMonitor();
+      updateMusicButton(true);
+      return previousCue;
+    }
+
+    activeMusicDeckIndex = -1;
+    if (musicWanted) startSynth();
+    updateMusicButton(musicWanted);
+    return null;
+  }
+
+  function continueCurrentMusic(options = {}) {
+    if (options.forcePlay) musicWanted = true;
+    if (!musicWanted) return Promise.resolve(currentMusicCue);
+
+    const cue = currentMusicCue || resolveMusicCue(
+      currentMusicTrackIndex >= 0 ? currentMusicTrackIndex : 0,
+    );
+    if (!cue) {
+      startSynth();
+      updateMusicButton(true);
+      return Promise.resolve(null);
+    }
+    setCurrentMusicCue(cue);
+
+    // CONTINUE 在交叉淡化过程中不另开一次切换，保持当前过渡即可。
+    if (musicSwitching) {
+      updateMusicButton(true);
+      return Promise.resolve(cue);
+    }
+
+    const deck = musicDecks[activeMusicDeckIndex] || null;
+    const deckCue = deck ? musicDeckCues.get(deck) : null;
+    if (!deck || !deckCue || deckCue.key !== cue.key) {
+      return switchToMusicCue(cue, options);
+    }
+
+    if (!deck.paused && !deck.ended) {
+      startMusicMonitor();
+      updateMusicButton(true);
+      return Promise.resolve(cue);
+    }
+
+    const token = ++musicSwitchToken;
+    musicDeckTokens.set(deck, token);
+    stopMusicMonitor();
+    cancelMusicFade();
+    musicSwitching = true;
+
+    const end = Number.isFinite(deckCue.end) ? deckCue.end : Infinity;
+    if (
+      !Number.isFinite(deck.currentTime) ||
+      deck.currentTime < deckCue.start - 0.05 ||
+      deck.currentTime >= end - 0.05
+    ) {
+      setMusicDeckTime(deck, deckCue.start);
+    }
+
+    const hadPlayingDeck = hasPlayingMusicDeck();
+    const playAttempt = requestMusicDeckPlay(deck);
+    if (!hadPlayingDeck) startSynth();
+    updateMusicButton(true);
+    return finishMusicResume(token, deck, deckCue, playAttempt);
+  }
+
+  async function finishMusicResume(token, deck, cue, playAttempt) {
+    let didPlay = await waitForMusicPromise(playAttempt, 8000, false);
+    if (!isCurrentMusicOperation(token, deck)) return null;
+    if (!didPlay || deck.paused) {
+      didPlay = await waitForMusicPromise(
+        requestMusicDeckPlay(deck),
+        6000,
+        false,
+      );
+    }
+    if (!isCurrentMusicOperation(token, deck)) return null;
+
+    if (!didPlay) {
+      musicSwitching = false;
+      startSynth();
+      updateMusicButton(true);
+      return null;
+    }
+
+    const targets = musicDecks.map((item) => ({
+      deck: item,
+      volume: item === deck ? musicVolume : 0,
+    }));
+    const fadePromise = fadeMusicDecks(targets, musicPauseFadeMs);
+    stopSynth();
+    const completed = await fadePromise;
+    if (!completed || !isCurrentMusicOperation(token, deck) || !musicWanted) {
+      return null;
+    }
+
+    musicDecks.forEach((item) => {
+      if (item !== deck) {
+        item.pause();
+        setMusicDeckBaseVolume(item, 0);
+      }
+    });
+    setMusicDeckBaseVolume(deck, musicVolume);
+    musicSwitching = false;
+    startMusicMonitor();
+    updateMusicButton(true);
+    return cue;
+  }
+
+  function startMusic() {
+    return applyMusicAction(MUSIC_CONTINUE, { forcePlay: true });
   }
 
   function stopMusic() {
     musicWanted = false;
-    music.pause();
+    cancelOpeningMusicRetry();
+    const token = ++musicSwitchToken;
+    musicSwitching = false;
+    stopMusicMonitor();
     stopSynth();
     updateMusicButton(false);
+
+    const targets = musicDecks.map((deck) => ({ deck, volume: 0 }));
+    return fadeMusicDecks(targets, musicPauseFadeMs).then((completed) => {
+      if (!completed || token !== musicSwitchToken || musicWanted) return false;
+      musicDecks.forEach((deck) => {
+        deck.pause();
+        setMusicDeckBaseVolume(deck, 0);
+      });
+      return true;
+    });
   }
 
   function updateMusicButton(forcePlaying) {
+    if (!musicToggle) return;
     const playing =
-      typeof forcePlaying === "boolean"
-        ? forcePlaying
-        : musicWanted && (!music.paused || Boolean(synthTimer));
+      typeof forcePlaying === "boolean" ? forcePlaying : musicWanted;
     musicToggle.setAttribute("aria-pressed", String(playing));
     musicToggle.setAttribute(
       "aria-label",
       playing ? "暂停背景音乐" : "播放背景音乐",
     );
-    musicToggle.querySelector("span").textContent = playing ? "♫" : "♪";
+    musicToggle.title = currentMusicCue?.title
+      ? (playing ? "暂停：" : "播放：") + currentMusicCue.title
+      : playing
+        ? "暂停背景音乐"
+        : "播放背景音乐";
+    const icon = musicToggle.querySelector("span");
+    if (icon) icon.textContent = playing ? "♫" : "♪";
   }
 
-  function startSynth() {
-    if (!musicWanted || synthTimer) return;
-    const AudioContext = window.AudioContext || window.webkitAudioContext;
-    if (!AudioContext) return;
-    synthContext ||= new AudioContext();
-    if (synthContext.state === "suspended") synthContext.resume();
-    synthGain ||= synthContext.createGain();
-    synthGain.gain.value = 0.15;
-    synthGain.connect(synthContext.destination);
+  function startMusicMonitor() {
+    stopMusicMonitor();
+    if (!musicWanted) return;
 
-    const notes = [261.63, 329.63, 392, 523.25, 440, 392, 329.63, 293.66];
-    const playNote = () => {
-      if (!musicWanted || !synthContext) return;
-      const now = synthContext.currentTime;
-      const oscillator = synthContext.createOscillator();
-      const gain = synthContext.createGain();
-      oscillator.type = "sine";
-      oscillator.frequency.value = notes[synthStep % notes.length];
-      gain.gain.setValueAtTime(0.0001, now);
-      gain.gain.exponentialRampToValueAtTime(0.13, now + 0.04);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.72);
-      oscillator.connect(gain);
-      gain.connect(synthGain);
-      oscillator.start(now);
-      oscillator.stop(now + 0.76);
-      synthStep += 1;
+    const monitor = () => {
+      musicMonitorFrame = 0;
+      if (!musicWanted) return;
+
+      if (!musicSwitching) {
+        const deck = musicDecks[activeMusicDeckIndex] || null;
+        const cue = deck ? musicDeckCues.get(deck) : null;
+        if (deck && cue && !deck.paused && Number.isFinite(cue.end)) {
+          const fadeMs = getMusicFadeDuration(musicFragmentLoopFadeMs);
+          const segmentSeconds = Math.max(0.2, cue.end - cue.start);
+          const leadSeconds = fadeMs > 0
+            ? Math.min(fadeMs / 1000, segmentSeconds * 0.45)
+            : 0.04;
+
+          if (deck.currentTime >= cue.end - leadSeconds) {
+            const remainingMs = Math.max(0, (cue.end - deck.currentTime) * 1000);
+            switchToMusicCue(cue, {
+              durationMs: fadeMs > 0 ? Math.min(fadeMs, remainingMs) : 0,
+              fragmentLoop: true,
+            });
+            return;
+          }
+        }
+      }
+
+      musicMonitorFrame = window.requestAnimationFrame(monitor);
     };
 
-    playNote();
-    synthTimer = window.setInterval(playNote, 620);
-    updateMusicButton(true);
+    musicMonitorFrame = window.requestAnimationFrame(monitor);
+  }
+
+  function stopMusicMonitor() {
+    if (musicMonitorFrame) window.cancelAnimationFrame(musicMonitorFrame);
+    musicMonitorFrame = 0;
+  }
+
+  function fadeMusicDecks(targets, duration) {
+    cancelMusicFade();
+    const generation = musicFadeGeneration;
+    const entries = targets
+      .filter(({ deck }) => Boolean(deck))
+      .map(({ deck, volume }) => ({
+        deck,
+        from: getMusicDeckBaseVolume(deck),
+        to: clamp(volume),
+      }));
+    const fadeDuration = getMusicFadeDuration(duration);
+
+    if (!entries.length || fadeDuration <= 0) {
+      entries.forEach(({ deck, to }) => {
+        setMusicDeckBaseVolume(deck, to);
+      });
+      return Promise.resolve(true);
+    }
+
+    return new Promise((resolve) => {
+      const startedAt = performance.now();
+      musicFadeResolve = resolve;
+
+      const step = (now) => {
+        if (generation !== musicFadeGeneration) return;
+        const progress = clamp((now - startedAt) / fadeDuration);
+        const eased = easeInOutCubic(progress);
+        entries.forEach(({ deck, from, to }) => {
+          setMusicDeckBaseVolume(deck, lerp(from, to, eased));
+        });
+
+        if (progress >= 1) {
+          musicFadeFrame = 0;
+          musicFadeResolve = null;
+          resolve(true);
+          return;
+        }
+        musicFadeFrame = window.requestAnimationFrame(step);
+      };
+
+      musicFadeFrame = window.requestAnimationFrame(step);
+    });
+  }
+
+  function cancelMusicFade() {
+    musicFadeGeneration += 1;
+    if (musicFadeFrame) window.cancelAnimationFrame(musicFadeFrame);
+    musicFadeFrame = 0;
+    if (musicFadeResolve) {
+      const resolve = musicFadeResolve;
+      musicFadeResolve = null;
+      resolve(false);
+    }
+  }
+
+  function getMusicFadeDuration(duration) {
+    const safeDuration = configuredNumber(duration, 0, 0);
+    return reducedMotion ? Math.min(safeDuration, 180) : safeDuration;
+  }
+
+  function isCurrentMusicOperation(token, deck) {
+    return (
+      token === musicSwitchToken &&
+      musicDeckTokens.get(deck) === token &&
+      musicWanted
+    );
+  }
+
+  function requestMusicDeckPlay(deck) {
+    try {
+      const result = deck.play();
+      return result && typeof result.then === "function"
+        ? result.then(() => true, () => false)
+        : Promise.resolve(true);
+    } catch {
+      return Promise.resolve(false);
+    }
+  }
+
+  function waitForMusicMetadata(deck, timeoutMs = 10000) {
+    if (deck.readyState >= 1 && Number.isFinite(deck.duration)) {
+      return Promise.resolve(true);
+    }
+
+    return new Promise((resolve) => {
+      let settled = false;
+      const finish = (value) => {
+        if (settled) return;
+        settled = true;
+        window.clearTimeout(timeout);
+        deck.removeEventListener("loadedmetadata", onReady);
+        deck.removeEventListener("error", onError);
+        resolve(value);
+      };
+      const onReady = () => finish(true);
+      const onError = () => finish(false);
+      const timeout = window.setTimeout(() => finish(false), timeoutMs);
+      deck.addEventListener("loadedmetadata", onReady);
+      deck.addEventListener("error", onError);
+    });
+  }
+
+  function waitForMusicPromise(promise, timeoutMs, fallback) {
+    return new Promise((resolve) => {
+      let settled = false;
+      const finish = (value) => {
+        if (settled) return;
+        settled = true;
+        window.clearTimeout(timeout);
+        resolve(value);
+      };
+      const timeout = window.setTimeout(() => finish(fallback), timeoutMs);
+      Promise.resolve(promise).then(finish, () => finish(fallback));
+    });
+  }
+
+  async function positionMusicDeckAtCueStart(
+    deck,
+    time,
+    token,
+    timeoutMs = 3200,
+  ) {
+    const targetTime = Math.max(0, Number.isFinite(time) ? time : 0);
+    const startedAt = performance.now();
+
+    do {
+      if (!isCurrentMusicOperation(token, deck)) return false;
+      setMusicDeckTime(deck, targetTime);
+
+      // 让浏览器完成一次 seek；无 Range 的简易本地服务器需要等缓冲推进后重试。
+      await new Promise((resolve) => window.setTimeout(resolve, 100));
+      const currentTime = Number(deck.currentTime);
+      if (
+        Number.isFinite(currentTime) &&
+        currentTime >= targetTime - 0.45 &&
+        currentTime <= targetTime + 1.25
+      ) {
+        return true;
+      }
+    } while (performance.now() - startedAt < timeoutMs);
+
+    // 超时后仍做最后一次定位；即使浏览器不报告 seek 状态，也不阻塞音乐播放。
+    setMusicDeckTime(deck, targetTime);
+    return false;
+  }
+
+  function setMusicDeckTime(deck, time) {
+    try {
+      deck.currentTime = Math.max(0, time);
+    } catch {
+      // metadata 刚就绪时个别旧浏览器可能暂时不可 seek；继续播放仍可正常工作。
+    }
+  }
+
+  function hasPlayingMusicDeck() {
+    return musicDecks.some(
+      (deck) => !deck.paused && !deck.ended && !deck.error,
+    );
+  }
+
+  // 本地文件无法加载时，用轻柔的 Web Audio 旋律兜底。
+  function startSynth() {
+    if (!musicWanted || !musicSynthFallbackAllowed || synthTimer) return;
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContext) return;
+
+    try {
+      synthContext ||= new AudioContext();
+      if (!synthGain) {
+        synthGain = synthContext.createGain();
+        synthGain.gain.value = SYNTH_MUSIC_VOLUME * musicDuckFactor;
+        synthGain.connect(synthContext.destination);
+      }
+      if (synthContext.state === "suspended") {
+        synthContext.resume().catch(() => {});
+      }
+
+      const notes = [261.63, 329.63, 392, 523.25, 440, 392, 329.63, 293.66];
+      const playNote = () => {
+        if (!musicWanted || !synthContext || synthContext.state === "closed") {
+          return;
+        }
+        const now = synthContext.currentTime;
+        const oscillator = synthContext.createOscillator();
+        const gain = synthContext.createGain();
+        oscillator.type = "sine";
+        oscillator.frequency.value = notes[synthStep % notes.length];
+        gain.gain.setValueAtTime(0.0001, now);
+        gain.gain.exponentialRampToValueAtTime(0.11, now + 0.04);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.72);
+        oscillator.connect(gain);
+        gain.connect(synthGain);
+        oscillator.start(now);
+        oscillator.stop(now + 0.76);
+        synthStep += 1;
+      };
+
+      playNote();
+      synthTimer = window.setInterval(playNote, 620);
+      updateMusicButton(true);
+    } catch {
+      // 音频兜底不可用时保持页面交互，不让异常影响视觉流程。
+    }
   }
 
   function stopSynth() {
     if (synthTimer) window.clearInterval(synthTimer);
     synthTimer = 0;
-    if (synthContext?.state === "running") synthContext.suspend();
+    if (synthContext?.state === "running") {
+      synthContext.suspend().catch(() => {});
+    }
   }
 
   // 以下函数是树枝绘制和缓动动画使用的纯数学工具。

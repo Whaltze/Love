@@ -48,6 +48,7 @@
   --photo-caption-size: clamp(13px, 1.28vw, 17px);
   --photo-caption-line-height: 1.45;
 
+
   /* ---------- 单张照片放大卡片 ---------- */
   --lightbox-card-width: 720px;
   --lightbox-caption-size: clamp(16px, 2.2vw, 23px);
@@ -1203,6 +1204,12 @@ body[data-phase="opening-caught"] {
   text-align: center;
 }
 
+.photo-caption-top {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
 .photo-frame {
   position: relative;
   aspect-ratio: var(--photo-card-aspect);
@@ -1456,6 +1463,19 @@ body[data-phase="opening-caught"] {
 .lightbox-frame.has-media {
   min-height: 0;
   background: #f8e9dc;
+}
+
+/* 图片使用自身比例撑开相框，避免竖图两侧出现大块留白；视频保持原布局。 */
+.lightbox-frame.has-image {
+  width: fit-content;
+  max-width: 100%;
+  margin-inline: auto;
+}
+
+.lightbox-frame.has-image .lightbox-image {
+  width: auto;
+  max-width: 100%;
+  height: auto;
 }
 
 .lightbox-frame.has-image .lightbox-image,

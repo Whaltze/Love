@@ -12,9 +12,9 @@
     <meta name="theme-color" content="#fff8ef" />
     <meta
       name="description"
-      content="从爱心树到生日愿望、照片流与惊喜礼物的浪漫互动网页。"
+      content="从爱心树到生日愿望、照片流与惊喜礼物的浪漫。"
     />
-    <title>爱心树 · 生日惊喜</title>
+    <title>MJ 生日快乐！</title>
     <link rel="stylesheet" href="./style.css" />
   </head>
   <body data-phase="opening">
@@ -61,16 +61,13 @@
     </section>
 
     <!--
-      背景音乐：
-      音频地址可替换 source 的 src。
-      如果远程音频不可用，script.js 会自动使用内置的轻柔合成旋律作为备用。
+      双音轨背景音乐：
+      歌曲顺序、每首歌的起止片段、每次点击切到哪一段，
+      都集中在 birthday-content.js 的 music 配置中修改。
+      两个 audio 会交替工作，让上一首淡出时下一首同步淡入。
     -->
-    <audio id="backgroundMusic" loop preload="none">
-      <source
-        src="http://m2.music.126.net/GvIMZ5ZW0l04xFMVYtTy8g==/18502581673300022.mp3"
-        type="audio/mpeg"
-      />
-    </audio>
+    <audio id="backgroundMusic" autoplay preload="auto" aria-hidden="true"></audio>
+    <audio id="backgroundMusicAlt" preload="metadata" aria-hidden="true"></audio>
 
     <button
       id="musicToggle"
