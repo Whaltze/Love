@@ -252,6 +252,26 @@
     );
   }
 
+  function getPhotoLoopCloneCount(photoCount) {
+    const safePhotoCount = Math.max(0, Math.round(Number(photoCount) || 0));
+    if (!safePhotoCount) return 0;
+    if (!hasMobilePerformanceMode()) return safePhotoCount;
+
+    return Math.min(
+      safePhotoCount,
+      Math.max(
+        1,
+        Math.round(
+          configuredNumber(
+            mobilePerformanceConfig.photoLoopCloneCount,
+            4,
+            1,
+          ),
+        ),
+      ),
+    );
+  }
+
   function getPhotoLoadAheadScreens() {
     return responsivePerformanceNumber(
       "photoLoadAheadScreens",
@@ -458,6 +478,15 @@
     : 0;
   const musicOpeningRetryOnInteraction =
     musicOpeningPlaybackConfig.retryOnFirstInteraction !== false;
+  const musicOpeningRetryOnLifecycle =
+    musicOpeningPlaybackConfig.retryOnPageLifecycle !== false;
+  const musicOpeningRetryEnabled =
+    musicOpeningRetryOnInteraction || musicOpeningRetryOnLifecycle;
+  const musicOpeningLifecycleRetryIntervalMs = configuredNumber(
+    musicOpeningPlaybackConfig.lifecycleRetryIntervalMs,
+    1200,
+    200,
+  );
   const musicOpeningFadeInMs = configuredNumber(
     musicOpeningPlaybackConfig.fadeInMs,
     musicCrossfadeMs,
@@ -666,6 +695,7 @@
   let openingMusicCue = null;
   let openingMusicAwaitingInteraction = false;
   let openingMusicRetryInstalled = false;
+  let openingMusicLastLifecycleRetryAt = Number.NEGATIVE_INFINITY;
   let synthContext = null;
   let synthGain = null;
   let synthTimer = 0;
@@ -980,6 +1010,13 @@
   }
 
   refreshMobileExperience({ refreshMedia: false });
+
+  // 先发起开场歌曲请求，再创建较重的 Canvas 与照片 DOM，缩短手机端首声等待。
+  registerPerformanceServiceWorker();
+  initializeMusicDecks();
+  initializeOpeningMusicPlayback();
+  startOpeningGate();
+
   flattenBranches(branchConfig, 0);
   const branchDuration = branches.reduce(
     (max, branch) => Math.max(max, branch.delay + branch.duration),
@@ -999,10 +1036,7 @@
   createBlooms();
   renderBirthdayCard();
   drawIdle();
-  initializeMusicDecks();
   exposeMusicInterface();
-  registerPerformanceServiceWorker();
-  startOpeningGate();
 
   if (hasMobilePerformanceMode()) {
     const deferredStart = getDeferredWorkDelayMs();
@@ -1133,6 +1167,9 @@
       mobileResizeFrame = 0;
       refreshMobileExperience();
       if (phase === "opening") moveCatchHeart(true);
+      if (photoStreamBuilt && photoScene.classList.contains("is-active")) {
+        syncPhotoLoopDistance();
+      }
     });
   }
   window.addEventListener("resize", scheduleResponsiveRefresh, {
@@ -1154,12 +1191,6 @@
     }
     triggerMusicAction("musicToggle", undefined, { forcePlay: true });
   });
-
-  /**
-   * 根据 music.opening.autoplay 在开场页立即尝试播放。
-   * 有声自动播放若被浏览器拦截，会在开场页第一次真实点击/按键时补播。
-   */
-  initializeOpeningMusicPlayback();
 
   /* =========================================================================
    * 0. 开场追逐爱心
@@ -1785,6 +1816,8 @@
     ensurePhotoStreamBuilt();
     photoSceneStarted = true;
     setPhase("photos");
+    syncPhotoLoopDistance();
+    requestAnimationFrame(syncPhotoLoopDistance);
     interactionStatus.textContent =
       "进入回忆流场景，照片和视频会从右向左缓缓经过，并显示上下文字说明。";
     activatePhotoMediaLoading();
@@ -1889,8 +1922,9 @@
    * ========================================================================= */
 
   /**
-   * 根据 photos 数组生成两套相同卡片。
-   * 第二套是无障碍隐藏副本，用来衔接第一套，实现无限循环。
+   * 第一套生成完整照片流；第二套只负责首尾衔接。
+   * 手机端可通过 mobile.performance.photoLoopCloneCount 控制缓冲卡片数量，
+   * 避免两套完整长轨道超过部分手机浏览器的合成层尺寸上限。
    */
   function buildPhotoStream() {
     if (photoStreamBuilt) return;
@@ -1924,18 +1958,42 @@
       `${Math.max(minimumTrackSeconds, photos.length * secondsPerCard)}s`,
     );
 
+    const loopCloneCount = getPhotoLoopCloneCount(photos.length);
     for (let setIndex = 0; setIndex < 2; setIndex += 1) {
+      const isLoopBuffer = setIndex === 1;
       const set = document.createElement("div");
-      set.className = "photo-track-set";
-      if (setIndex === 1) set.setAttribute("aria-hidden", "true");
+      set.className = isLoopBuffer
+        ? "photo-track-set photo-track-loop-buffer"
+        : "photo-track-set";
+      if (isLoopBuffer) set.setAttribute("aria-hidden", "true");
 
-      photos.forEach((photo, index) => {
-        set.append(createPhotoCard(photo || {}, index, setIndex === 0));
+      const setPhotos = isLoopBuffer
+        ? photos.slice(0, loopCloneCount)
+        : photos;
+      setPhotos.forEach((photo, index) => {
+        set.append(createPhotoCard(photo || {}, index, !isLoopBuffer));
       });
       photoTrack.append(set);
     }
+    syncPhotoLoopDistance();
     preparePhotoMediaLoading();
     preparePhotoVideoPlayback();
+  }
+
+  // 使用第一套完整轨道的实际像素宽度作为循环距离，不再依赖双轨恰好各占 50%。
+  function syncPhotoLoopDistance() {
+    if (!photoStreamBuilt) return 0;
+    const firstSet = photoTrack.querySelector(
+      ".photo-track-set:not(.photo-track-loop-buffer)",
+    );
+    const loopDistance = firstSet?.getBoundingClientRect().width || 0;
+    if (!loopDistance) return 0;
+
+    photoTrack.style.setProperty(
+      "--photo-loop-offset",
+      -loopDistance + "px",
+    );
+    return loopDistance;
   }
 
   function preparePhotoMediaLoading() {
@@ -1975,7 +2033,18 @@
   function activatePhotoMediaLoading() {
     ensurePhotoStreamBuilt();
     const media = [...photoTrack.querySelectorAll("[data-photo-src]")];
-    media.slice(0, Math.min(getPhotoInitialCount(), media.length)).forEach((item) => {
+    const initialMedia = media.slice(
+      0,
+      Math.min(getPhotoInitialCount(), media.length),
+    );
+    const loopBufferMedia = [
+      ...photoTrack.querySelectorAll(
+        ".photo-track-loop-buffer [data-photo-src]",
+      ),
+    ];
+
+    // 循环缓冲区只有少量开头卡片，进入场景时主动加载，避免第 19 张后接到空白。
+    new Set([...initialMedia, ...loopBufferMedia]).forEach((item) => {
       loadDeferredPhotoMedia(item, true);
       photoMediaObserver?.unobserve(item);
     });
@@ -3070,8 +3139,13 @@
       cardLines.append(paragraph);
     }
     cardSignature.textContent = card.signature || "—— 永远爱你的人";
-    finalWish.textContent =
-      card.finalWish || "愿你每一个愿望，都在未来被温柔接住。";
+    const finalWishLines = Array.isArray(card.finalWish)
+      ? card.finalWish
+      : [
+          card.finalWish ||
+            "愿你每一个愿望，都在未来被温柔接住。",
+        ];
+    finalWish.textContent = finalWishLines.map(String).join("\n");
   }
 
   /* =========================================================================
@@ -3266,6 +3340,7 @@
       musicDeckBaseVolumes.set(deck, 0);
       deck.volume = 0;
       deck.setAttribute("playsinline", "");
+      deck.setAttribute("webkit-playsinline", "");
       musicDeckCues.set(deck, null);
       musicDeckTokens.set(deck, 0);
 
@@ -3302,7 +3377,7 @@
 
   /**
    * 在“先抓住这颗心”页面尝试播放配置的片段。
-   * 浏览器允许时会立即播放；若被自动播放策略拦截，则等待第一次真实操作补播。
+   * 支持自动播放的浏览器会立即开声；微信桥接、页面恢复和第一次触摸会继续补试。
    */
   function initializeOpeningMusicPlayback() {
     updateMusicButton(false);
@@ -3312,19 +3387,16 @@
     if (!openingMusicCue) return;
     setCurrentMusicCue(openingMusicCue);
 
-    if (musicOpeningRetryOnInteraction) {
+    if (musicOpeningRetryEnabled) {
       openingMusicAwaitingInteraction = true;
       installOpeningMusicRetry();
     }
 
-    switchToMusicCue(openingMusicCue, {
-      forcePlay: true,
-      allowSynthFallback: false,
-      durationMs: musicOpeningFadeInMs,
-    }).then(() => {
+    openingMusicLastLifecycleRetryAt = performance.now();
+    attemptOpeningMusicPlayback(false).then(() => {
       if (hasPlayingMusicDeck()) {
         confirmOpeningMusicPlayback();
-      } else if (!musicOpeningRetryOnInteraction) {
+      } else if (!musicOpeningRetryEnabled) {
         musicWanted = false;
         updateMusicButton(false);
       }
@@ -3332,18 +3404,80 @@
     scheduleMusicPreloading(openingMusicCue);
   }
 
+  function attemptOpeningMusicPlayback(allowSynthFallback) {
+    const cue = openingMusicCue || currentMusicCue || resolveMusicCue(0);
+    if (!cue) return Promise.resolve(null);
+
+    setCurrentMusicCue(cue);
+    return switchToMusicCue(cue, {
+      forcePlay: true,
+      allowSynthFallback,
+      durationMs: musicOpeningFadeInMs,
+    });
+  }
+
   function installOpeningMusicRetry() {
     if (openingMusicRetryInstalled) return;
     openingMusicRetryInstalled = true;
-    document.addEventListener("pointerdown", handleOpeningMusicInteraction, true);
-    document.addEventListener("keydown", handleOpeningMusicInteraction, true);
+
+    if (musicOpeningRetryOnInteraction) {
+      document.addEventListener("pointerdown", handleOpeningMusicInteraction, true);
+      document.addEventListener("touchstart", handleOpeningMusicInteraction, {
+        capture: true,
+        passive: true,
+      });
+      document.addEventListener("keydown", handleOpeningMusicInteraction, true);
+    }
+
+    if (musicOpeningRetryOnLifecycle) {
+      window.addEventListener("load", handleOpeningMusicLifecycleRetry);
+      window.addEventListener("pageshow", handleOpeningMusicLifecycleRetry);
+      document.addEventListener(
+        "visibilitychange",
+        handleOpeningMusicLifecycleRetry,
+      );
+      document.addEventListener(
+        "WeixinJSBridgeReady",
+        handleOpeningMusicLifecycleRetry,
+      );
+      document.addEventListener(
+        "YixinJSBridgeReady",
+        handleOpeningMusicLifecycleRetry,
+      );
+
+      // 微信桥接若先于 defer 脚本就绪，不再等待一个不会重复触发的事件。
+      if (window.WeixinJSBridge || window.YixinJSBridge) {
+        Promise.resolve().then(() =>
+          handleOpeningMusicLifecycleRetry({
+            type: window.WeixinJSBridge
+              ? "WeixinJSBridgeReady"
+              : "YixinJSBridgeReady",
+          }),
+        );
+      }
+    }
   }
 
   function removeOpeningMusicRetry() {
     if (!openingMusicRetryInstalled) return;
     openingMusicRetryInstalled = false;
     document.removeEventListener("pointerdown", handleOpeningMusicInteraction, true);
+    document.removeEventListener("touchstart", handleOpeningMusicInteraction, true);
     document.removeEventListener("keydown", handleOpeningMusicInteraction, true);
+    window.removeEventListener("load", handleOpeningMusicLifecycleRetry);
+    window.removeEventListener("pageshow", handleOpeningMusicLifecycleRetry);
+    document.removeEventListener(
+      "visibilitychange",
+      handleOpeningMusicLifecycleRetry,
+    );
+    document.removeEventListener(
+      "WeixinJSBridgeReady",
+      handleOpeningMusicLifecycleRetry,
+    );
+    document.removeEventListener(
+      "YixinJSBridgeReady",
+      handleOpeningMusicLifecycleRetry,
+    );
   }
 
   function handleOpeningMusicInteraction(event) {
@@ -3370,6 +3504,37 @@
     retryOpeningMusicAfterInteraction();
   }
 
+  function handleOpeningMusicLifecycleRetry(event) {
+    if (!openingMusicAwaitingInteraction) {
+      removeOpeningMusicRetry();
+      return;
+    }
+    if (document.visibilityState === "hidden") return;
+    if (hasPlayingMusicDeck()) {
+      confirmOpeningMusicPlayback();
+      return;
+    }
+
+    const eventType = String(event?.type || "");
+    const isBridgeReady =
+      eventType === "WeixinJSBridgeReady" ||
+      eventType === "YixinJSBridgeReady";
+    const now = performance.now();
+    if (
+      !isBridgeReady &&
+      (musicSwitching ||
+        now - openingMusicLastLifecycleRetryAt <
+          musicOpeningLifecycleRetryIntervalMs)
+    ) {
+      return;
+    }
+
+    openingMusicLastLifecycleRetryAt = now;
+    attemptOpeningMusicPlayback(false).then(() => {
+      if (hasPlayingMusicDeck()) confirmOpeningMusicPlayback();
+    });
+  }
+
   function retryOpeningMusicAfterInteraction() {
     if (!openingMusicAwaitingInteraction) {
       return applyMusicAction(MUSIC_CONTINUE, { forcePlay: true });
@@ -3378,20 +3543,7 @@
     openingMusicAwaitingInteraction = false;
     removeOpeningMusicRetry();
     musicSynthFallbackAllowed = true;
-    const cue = openingMusicCue || currentMusicCue || resolveMusicCue(0);
-    if (cue) {
-      setCurrentMusicCue(cue);
-      return switchToMusicCue(cue, {
-        forcePlay: true,
-        allowSynthFallback: true,
-        durationMs: musicOpeningFadeInMs,
-      });
-    }
-
-    musicWanted = true;
-    startSynth();
-    updateMusicButton(true);
-    return Promise.resolve(null);
+    return attemptOpeningMusicPlayback(true);
   }
 
   function confirmOpeningMusicPlayback() {
@@ -4552,6 +4704,10 @@
       performance: {
         enabled: hasMobilePerformanceMode(),
         initialPhotoCount: getPhotoInitialCount(),
+        photoLoopCloneCount: getPhotoLoopCloneCount(
+          getConfiguredPhotos().length,
+        ),
+        photoLoopDistancePx: syncPhotoLoopDistance(),
         photoLoadAheadScreens: getPhotoLoadAheadScreens(),
         thumbnailBatchSize: getPhotoThumbnailBatchSize(),
         previewNeighborCount: getPhotoPreviewNeighborCount(),
@@ -4613,6 +4769,11 @@
       refresh() {
         refreshMobileExperience();
         return getMobileDebugState();
+      },
+      // 调整照片卡片宽度、间距或手机循环缓冲数量后，可手动重新测量循环距离。
+      syncPhotoLoop() {
+        ensurePhotoStreamBuilt();
+        return syncPhotoLoopDistance();
       },
       pauseLoading() {
         setNonCriticalWorkSuspended(true);

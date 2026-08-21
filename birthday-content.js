@@ -118,6 +118,12 @@ window.BIRTHDAY_CONTENT = {
       // 自动播放被浏览器拦截时，是否在第一次真实操作中补播。
       retryOnFirstInteraction: true,
 
+      // load、pageshow、重新回到前台以及微信桥接就绪时，再主动尝试一次。
+      retryOnPageLifecycle: true,
+
+      // 上述自动补试的最小间隔；微信桥接就绪事件不受该间隔限制。
+      lifecycleRetryIntervalMs: 1200,
+
       // 开场歌曲淡入时长。
       fadeInMs: 700,
     },
@@ -594,7 +600,7 @@ window.BIRTHDAY_CONTENT = {
       storyLineHeight: 1.76,
 
       // 树和时间表共用的整体下移量与缩放比例。
-      heartArtOffsetYPx: 220,
+      heartArtOffsetYPx: 220, 
       heartArtScale: 0.84,
 
       // 时间表相对树的二次微调；offset 可填写负数。
@@ -610,6 +616,11 @@ window.BIRTHDAY_CONTENT = {
 
       // 照片流进入时只立即挂载前几个媒体，其余继续由观察器异步加载。
       initialPhotoCount: 3,
+
+      // 手机端只复制开头几张作为首尾循环缓冲；建议保持 3～5 张以覆盖一屏。
+      // 数值越大衔接余量越多，但同时创建的照片节点也会增加。
+      photoLoopCloneCount: 4,
+
       photoLoadAheadScreens: 0.65,
       thumbnailWarmupDelayMs: 9000,
       thumbnailBatchSize: 2,
@@ -1109,9 +1120,9 @@ window.BIRTHDAY_CONTENT = {
     ],
     signature: "",
     finalWish: [
-      "愿你每一个愿望，都在未来被温柔接住。\n"+
+      "愿你每一个愿望，都在未来被温柔接住。",
+      "",
       "回复礼物，即得贺礼！",
-      ""
     ],
   },
 };

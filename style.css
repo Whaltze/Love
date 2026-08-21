@@ -1991,6 +1991,7 @@ body.is-scene-transitioning .photo-track {
   height: 0;
   margin: 0;
   overflow: hidden;
+  white-space: pre-line;
   color: #b76d70;
   font-family: var(--font-romantic);
   font-size: clamp(15px, 2vw, 20px);
@@ -2130,7 +2131,7 @@ body.is-scene-transitioning .photo-track {
     transform: translate3d(0, 0, 0);
   }
   to {
-    transform: translate3d(-50%, 0, 0);
+    transform: translate3d(var(--photo-loop-offset, -50%), 0, 0);
   }
 }
 
@@ -2294,6 +2295,11 @@ body.mobile-layout-debug .clock-box {
 }
 
 /* 手机端关闭高成本模糊与持续柔光，保留淡入淡出和主要动作。 */
+/* 手机端不把整条超长胶片强制提升为单个 GPU 合成层，避免尾部副本被裁剪。 */
+body.is-mobile-experience .photo-track {
+  will-change: auto;
+}
+
 body.is-mobile-experience.mobile-reduced-effects .photo-aurora {
   filter: none;
   animation: none;

@@ -20,6 +20,7 @@
       href="./assets/audio/optimized/sakura-grass.mp3"
       as="audio"
       type="audio/mpeg"
+      fetchpriority="high"
     />
     <link rel="stylesheet" href="./style.css" />
   </head>
@@ -72,8 +73,21 @@
       都集中在 birthday-content.js 的 music 配置中修改。
       两个 audio 会交替工作，让上一首淡出时下一首同步淡入。
     -->
-    <audio id="backgroundMusic" autoplay preload="auto" aria-hidden="true"></audio>
-    <audio id="backgroundMusicAlt" preload="metadata" aria-hidden="true"></audio>
+    <audio
+      id="backgroundMusic"
+      autoplay
+      preload="auto"
+      playsinline
+      webkit-playsinline
+      aria-hidden="true"
+    ></audio>
+    <audio
+      id="backgroundMusicAlt"
+      preload="metadata"
+      playsinline
+      webkit-playsinline
+      aria-hidden="true"
+    ></audio>
 
     <button
       id="musicToggle"

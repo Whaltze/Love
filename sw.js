@@ -6,7 +6,7 @@
  * - 图片和视频：缓存优先并后台更新；
  * - 音频：完整文件缓存优先，并从完整缓存中响应 Range 请求。
  */
-const CACHE_VERSION = "2026-08-21-v2";
+const CACHE_VERSION = "2026-08-21-v3";
 const CACHE_PREFIX = "birthday-runtime-";
 const PAGE_CACHE = `${CACHE_PREFIX}pages-${CACHE_VERSION}`;
 const MEDIA_CACHE = `${CACHE_PREFIX}media-${CACHE_VERSION}`;
@@ -44,8 +44,8 @@ self.addEventListener("fetch", (event) => {
   if (isAudioRequest(request, url)) {
     event.respondWith(
       request.headers.has("range")
-        ? respondToAudioRangeRequest(request)
-        : cacheFirstFullAudio(request),
+        ? respondToAudioRangeRequest(request, event)
+        : cacheFirstFullAudio(request, event),
     );
     return;
   }
@@ -159,7 +159,16 @@ function staleWhileRevalidate(request, cacheName, event) {
     .then((cached) => cached || update);
 }
 
-async function cacheFirstFullAudio(request) {
+function cacheResponseInBackground(cache, key, response, event) {
+  const cacheTask = cache.put(key, response.clone()).catch(() => undefined);
+  try {
+    event?.waitUntil(cacheTask);
+  } catch {
+    // 某些旧浏览器可能不允许在异步阶段延长事件；此时仍直接返回网络流。
+  }
+}
+
+async function cacheFirstFullAudio(request, event) {
   const cache = await caches.open(AUDIO_CACHE);
   const key = canonicalRequest(request.url);
   const cached = await cache.match(key);
@@ -167,12 +176,13 @@ async function cacheFirstFullAudio(request) {
 
   const response = await fetch(request);
   if (canCacheCompleteResponse(response)) {
-    await cache.put(key, response.clone());
+    // 不等待整首歌曲写完缓存；立即把网络流交给 audio，缓存放到后台完成。
+    cacheResponseInBackground(cache, key, response, event);
   }
   return response;
 }
 
-async function respondToAudioRangeRequest(request) {
+async function respondToAudioRangeRequest(request, event) {
   const cache = await caches.open(AUDIO_CACHE);
   const key = canonicalRequest(request.url);
   const cachedFullResponse = await cache.match(key);
@@ -189,8 +199,9 @@ async function respondToAudioRangeRequest(request) {
   // 206 只包含一个片段，绝不能当作完整歌曲写入缓存。
   if (networkResponse.status !== 200) return networkResponse;
 
-  await cache.put(key, networkResponse.clone());
-  return createPartialResponse(networkResponse, request.headers.get("range"));
+  // 服务器忽略 Range 并返回 200 时也要先让播放器边收边播，不能为切片等待整首下载。
+  cacheResponseInBackground(cache, key, networkResponse, event);
+  return networkResponse;
 }
 
 async function createPartialResponse(fullResponse, rangeHeader) {
