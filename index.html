@@ -95,25 +95,31 @@
           <div id="storyText"></div>
         </div>
 
-        <!-- 相识日期在 birthday-content.js 的 relationship.startedAt 中修改。 -->
-        <div id="clockBox" class="clock-box" aria-live="off">
-          <div class="clock-heading">
-            距离破壳日<span>  </span><span> </span>
+        <!--
+          树与相识计时放在同一个可缩放容器中：桌面端保持原比例，
+          手机端可通过 birthday-content.js / mobile.layout 整体下移和缩放。
+        -->
+        <div id="heartArt" class="heart-art">
+          <!-- 相识日期在 birthday-content.js 的 relationship.startedAt 中修改。 -->
+          <div id="clockBox" class="clock-box" aria-live="off">
+            <div class="clock-heading">
+              距离破壳日<span>  </span><span> </span>
+            </div>
+            <div id="clock"></div>
           </div>
-          <div id="clock"></div>
-        </div>
 
-        <!-- Canvas 负责绘制中央红心、树枝、花朵和飘落花瓣。 -->
-        <canvas
-          id="loveCanvas"
-          width="1100"
-          height="680"
-          role="button"
-          tabindex="0"
-          aria-label="点击红心，开启爱心树动画"
-        >
-          您的浏览器需要支持 HTML5 Canvas 才能观看动画。
-        </canvas>
+          <!-- Canvas 负责绘制中央红心、树枝、花朵和飘落花瓣。 -->
+          <canvas
+            id="loveCanvas"
+            width="1100"
+            height="680"
+            role="button"
+            tabindex="0"
+            aria-label="点击红心，开启爱心树动画"
+          >
+            您的浏览器需要支持 HTML5 Canvas 才能观看动画。
+          </canvas>
+        </div>
 
         <!-- 情书结束后，从右侧走出的米老鼠邀请区域。 -->
         <div id="mouseIntro" class="mouse-guide intro-guide" aria-hidden="true">

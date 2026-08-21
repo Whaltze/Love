@@ -41,6 +41,8 @@
   const catchArena = document.querySelector("#catchArena");
   const catchHeart = document.querySelector("#catchHeart");
   const catchTrail = document.querySelector("#catchTrail");
+  const stage = document.querySelector("#stage");
+  const heartArt = document.querySelector("#heartArt");
   const canvas = document.querySelector("#loveCanvas");
   const ctx = canvas.getContext("2d");
   const story = document.querySelector("#story");
@@ -142,6 +144,18 @@
     musicConfig.loading && typeof musicConfig.loading === "object"
       ? musicConfig.loading
       : {};
+  const mobileConfig =
+    birthdayContent.mobile && typeof birthdayContent.mobile === "object"
+      ? birthdayContent.mobile
+      : {};
+  const mobileLayoutConfig =
+    mobileConfig.layout && typeof mobileConfig.layout === "object"
+      ? mobileConfig.layout
+      : {};
+  const mobilePerformanceConfig =
+    mobileConfig.performance && typeof mobileConfig.performance === "object"
+      ? mobileConfig.performance
+      : {};
 
   /**
    * 统一读取数字配置：若用户误填文字或负数，则使用默认值。
@@ -152,26 +166,50 @@
     return Number.isFinite(number) ? Math.max(minimum, number) : fallback;
   }
 
+  // 手机模式既可按断点自动启用，也可通过 URL 或调试接口强制切换。
+  const mobileBreakpointPx = configuredNumber(
+    mobileConfig.breakpointPx,
+    700,
+    320,
+  );
+  const mobileMediaQuery = window.matchMedia(
+    `(max-width: ${mobileBreakpointPx}px)`,
+  );
+  const queryParameters = new URLSearchParams(window.location.search);
+  const hasEnabledQueryFlag = (name) => {
+    const value = String(queryParameters.get(name) || "").toLowerCase();
+    return value === "1" || value === "true" || value === "yes";
+  };
+  let mobileForcedMode = hasEnabledQueryFlag("mobilePreview") ? true : null;
+  let isMobileExperience =
+    mobileForcedMode === null
+      ? mobileConfig.enabled !== false && mobileMediaQuery.matches
+      : mobileForcedMode;
+  let mobileDebugEnabled =
+    mobileConfig.debug === true || hasEnabledQueryFlag("mobileDebug");
+  let mobileLayoutOverrides = {};
+  let mobileResizeFrame = 0;
+
   // 异步加载和持久缓存参数，均可在 birthday-content.js / loading 中调整。
   const serviceWorkerEnabled = loadingConfig.serviceWorker !== false;
-  const photoLoadAheadScreens = configuredNumber(
+  const desktopPhotoLoadAheadScreens = configuredNumber(
     loadingConfig.photoLoadAheadScreens,
     1.25,
     0,
   );
-  const photoThumbnailWarmupDelayMs = configuredNumber(
+  const desktopPhotoThumbnailWarmupDelayMs = configuredNumber(
     loadingConfig.thumbnailWarmupDelayMs,
     4500,
     0,
   );
-  const photoPreviewNeighborCount = Math.round(
+  const desktopPhotoPreviewNeighborCount = Math.round(
     configuredNumber(loadingConfig.previewNeighborCount, 1, 0),
   );
   const photoSkipOnSaveData = loadingConfig.skipOnSaveData !== false;
-  const musicPreloadAhead = Math.round(
+  const desktopMusicPreloadAhead = Math.round(
     configuredNumber(musicLoadingConfig.preloadAhead, 3, 0),
   );
-  const musicPhotoPreloadAhead = Math.round(
+  const desktopMusicPhotoPreloadAhead = Math.round(
     configuredNumber(musicLoadingConfig.photoPreloadAhead, 3, 0),
   );
   const musicPreloadDelayMs = configuredNumber(
@@ -188,6 +226,195 @@
   );
   const musicPersistentCache = musicLoadingConfig.persistentCache !== false;
   const musicSkipOnSaveData = musicLoadingConfig.skipOnSaveData !== false;
+
+  function hasMobilePerformanceMode() {
+    return (
+      isMobileExperience &&
+      mobileConfig.enabled !== false &&
+      mobilePerformanceConfig.enabled !== false
+    );
+  }
+
+  function responsivePerformanceNumber(
+    key,
+    desktopValue,
+    fallback = desktopValue,
+    minimum = 0,
+  ) {
+    return hasMobilePerformanceMode()
+      ? configuredNumber(mobilePerformanceConfig[key], fallback, minimum)
+      : desktopValue;
+  }
+
+  function getPhotoInitialCount() {
+    return Math.round(
+      responsivePerformanceNumber("initialPhotoCount", 6, 3, 1),
+    );
+  }
+
+  function getPhotoLoadAheadScreens() {
+    return responsivePerformanceNumber(
+      "photoLoadAheadScreens",
+      desktopPhotoLoadAheadScreens,
+      0.65,
+      0,
+    );
+  }
+
+  function getPhotoThumbnailWarmupDelayMs() {
+    return responsivePerformanceNumber(
+      "thumbnailWarmupDelayMs",
+      desktopPhotoThumbnailWarmupDelayMs,
+      9000,
+      0,
+    );
+  }
+
+  function getPhotoThumbnailBatchSize() {
+    return Math.round(
+      responsivePerformanceNumber(
+        "thumbnailBatchSize",
+        Number.POSITIVE_INFINITY,
+        2,
+        1,
+      ),
+    );
+  }
+
+  function getPhotoThumbnailBatchGapMs() {
+    return responsivePerformanceNumber("thumbnailBatchGapMs", 0, 850, 0);
+  }
+
+  function getPhotoPreviewNeighborCount() {
+    return Math.round(
+      responsivePerformanceNumber(
+        "previewNeighborCount",
+        desktopPhotoPreviewNeighborCount,
+        1,
+        0,
+      ),
+    );
+  }
+
+  function getMusicPreloadAhead() {
+    return Math.round(
+      responsivePerformanceNumber(
+        "musicPreloadAhead",
+        desktopMusicPreloadAhead,
+        1,
+        0,
+      ),
+    );
+  }
+
+  function getMusicPhotoPreloadAhead() {
+    return Math.round(
+      responsivePerformanceNumber(
+        "photoMusicPreloadAhead",
+        desktopMusicPhotoPreloadAhead,
+        1,
+        0,
+      ),
+    );
+  }
+
+  function getMobileTransitionScale() {
+    return hasMobilePerformanceMode()
+      ? configuredNumber(
+          mobilePerformanceConfig.transitionDurationScale,
+          0.86,
+          0.1,
+        )
+      : 1;
+  }
+
+  function getDeferredWorkDelayMs() {
+    return responsivePerformanceNumber("deferNonCriticalMs", 0, 900, 0);
+  }
+
+  function getIdleWorkTimeoutMs() {
+    return responsivePerformanceNumber("idleTimeoutMs", 1200, 1800, 100);
+  }
+
+  function getTreeBloomCount() {
+    return Math.round(
+      responsivePerformanceNumber(
+        "treeBloomCount",
+        configuredNumber(effectsConfig.treeBloomCount, 700, 1),
+        460,
+        1,
+      ),
+    );
+  }
+
+  function getTreeFrameIntervalMs() {
+    if (!hasMobilePerformanceMode()) return 0;
+    const targetFps = responsivePerformanceNumber("treeTargetFps", 60, 36, 1);
+    return 1000 / targetFps;
+  }
+
+  function getMaximumFallingPetals() {
+    return Math.round(
+      responsivePerformanceNumber("maxFallingPetals", 18, 8, 0),
+    );
+  }
+
+  function getPetalIntervalMs() {
+    return responsivePerformanceNumber("petalIntervalMs", 320, 520, 40);
+  }
+
+  function getTransitionHeadRows() {
+    return Math.round(
+      responsivePerformanceNumber(
+        "transitionHeadRows",
+        configuredNumber(effectsConfig.transitionHeadRows, 8, 1),
+        6,
+        1,
+      ),
+    );
+  }
+
+  function getTransitionHeadColumns() {
+    return Math.round(
+      responsivePerformanceNumber(
+        "transitionHeadColumns",
+        configuredNumber(effectsConfig.transitionHeadColumns, 12, 1),
+        8,
+        1,
+      ),
+    );
+  }
+
+  function getTransitionHeadDelaySpreadMs() {
+    return responsivePerformanceNumber(
+      "transitionHeadDelaySpreadMs",
+      760,
+      480,
+      0,
+    );
+  }
+
+  function getGiftSparkleCount() {
+    return Math.round(
+      responsivePerformanceNumber(
+        "giftSparkleCount",
+        configuredNumber(effectsConfig.giftSparkleCount, 34, 0),
+        24,
+        0,
+      ),
+    );
+  }
+
+  function getFinalFloatingHeartCount() {
+    return Math.round(
+      responsivePerformanceNumber(
+        "finalFloatingHeartCount",
+        configuredNumber(effectsConfig.finalFloatingHeartCount, 40, 0),
+        30,
+        0,
+      ),
+    );
+  }
 
   // 音乐动作保留符号；在 birthday-content.js / music.actions 中直接使用。
   const MUSIC_NEXT = "NEXT";
@@ -409,6 +636,7 @@
   let lastCatchPosition = null;
   let animationStartedAt = 0;
   let lastFrameAt = 0;
+  let lastTreeRenderAt = 0;
   let lastPetalAt = 0;
   let storyStarted = false;
   let storyAnimationId = 0;
@@ -447,6 +675,8 @@
   let giftGuideShown = false;
   let giftOpened = false;
   let floatingHeartsCreated = false;
+  let photoStreamBuilt = false;
+  let giftSparklesBuilt = false;
   let lightboxReturnTarget = null;
   let lightboxMediaToken = 0;
   let photoPointerId = null;
@@ -458,7 +688,9 @@
   let suppressNextPhotoClick = false;
   let filmHintTimer = 0;
   let photoMediaObserver = null;
+  let photoVideoPlaybackObserver = null;
   let photoThumbnailWarmupTimer = 0;
+  let photoThumbnailWarmupGeneration = 0;
   let musicPreloadTimer = 0;
   let musicPreloadAllTimer = 0;
   let imagePrefetchQueue = Promise.resolve();
@@ -466,9 +698,287 @@
   let audioPrefetchRunning = false;
   const pendingAudioPrefetchJobs = new Map();
   let serviceWorkerRegistrationPromise = null;
+  let nonCriticalWorkSuspended = false;
+  const nonCriticalResumeWaiters = new Set();
   const prefetchedMediaUrls = new Set();
   const sceneTimers = new Set();
 
+  const mobileLayoutDefaults = Object.freeze({
+    stageMinHeightPx: 690,
+    storyTopPx: 18,
+    storyReservedHeightPx: 315,
+    storySidePaddingPx: 18,
+    storyFontSizePx: 11.5,
+    storyLineHeight: 1.76,
+    heartArtOffsetYPx: 330,
+    heartArtScale: 0.84,
+    clockOffsetYPx: 0,
+    clockScale: 0.92,
+    bottomSpacePx: 84,
+  });
+  const mobileLayoutLimits = Object.freeze({
+    stageMinHeightPx: [320, 3000],
+    storyTopPx: [0, 1000],
+    storyReservedHeightPx: [100, 1800],
+    storySidePaddingPx: [0, 160],
+    storyFontSizePx: [6, 40],
+    storyLineHeight: [1, 4],
+    heartArtOffsetYPx: [0, 2000],
+    heartArtScale: [0.25, 1.5],
+    clockOffsetYPx: [-500, 1000],
+    clockScale: [0.25, 1.5],
+    bottomSpacePx: [0, 1000],
+  });
+
+  function clampNumber(value, minimum, maximum, fallback) {
+    const number = Number(value);
+    if (!Number.isFinite(number)) return fallback;
+    return Math.min(maximum, Math.max(minimum, number));
+  }
+
+  function getMobileLayoutSnapshot() {
+    const snapshot = {};
+    Object.keys(mobileLayoutDefaults).forEach((key) => {
+      const [minimum, maximum] = mobileLayoutLimits[key];
+      const configuredValue = Object.prototype.hasOwnProperty.call(
+        mobileLayoutOverrides,
+        key,
+      )
+        ? mobileLayoutOverrides[key]
+        : mobileLayoutConfig[key];
+      snapshot[key] = clampNumber(
+        configuredValue,
+        minimum,
+        maximum,
+        mobileLayoutDefaults[key],
+      );
+    });
+    return snapshot;
+  }
+
+  function applyMobileCssVariables(layout = getMobileLayoutSnapshot()) {
+    const rootStyle = document.documentElement.style;
+    const viewportWidth = Math.max(
+      1,
+      stage?.clientWidth ||
+        document.documentElement.clientWidth ||
+        window.innerWidth ||
+        mobileBreakpointPx,
+    );
+    const scaledHeartHeight =
+      (viewportWidth * HEIGHT * layout.heartArtScale) / WIDTH;
+    const requiredForArt =
+      layout.heartArtOffsetYPx + scaledHeartHeight + layout.bottomSpacePx;
+    const requiredForStory =
+      layout.storyTopPx + layout.storyReservedHeightPx + 24;
+    const stageHeight = Math.ceil(
+      Math.max(layout.stageMinHeightPx, requiredForArt, requiredForStory),
+    );
+
+    rootStyle.setProperty(
+      "--mobile-stage-min-height",
+      `${layout.stageMinHeightPx}px`,
+    );
+    rootStyle.setProperty("--mobile-stage-height", `${stageHeight}px`);
+    rootStyle.setProperty("--mobile-story-top", `${layout.storyTopPx}px`);
+    rootStyle.setProperty(
+      "--mobile-story-reserved-height",
+      `${layout.storyReservedHeightPx}px`,
+    );
+    rootStyle.setProperty(
+      "--mobile-story-side-padding",
+      `${layout.storySidePaddingPx}px`,
+    );
+    rootStyle.setProperty(
+      "--mobile-story-font-size",
+      `${layout.storyFontSizePx}px`,
+    );
+    rootStyle.setProperty(
+      "--mobile-story-line-height",
+      String(layout.storyLineHeight),
+    );
+    rootStyle.setProperty(
+      "--mobile-heart-art-offset-y",
+      `${layout.heartArtOffsetYPx}px`,
+    );
+    rootStyle.setProperty(
+      "--mobile-heart-art-scale",
+      String(layout.heartArtScale),
+    );
+    rootStyle.setProperty(
+      "--mobile-clock-offset-y",
+      `${layout.clockOffsetYPx}px`,
+    );
+    rootStyle.setProperty(
+      "--mobile-clock-scale",
+      String(layout.clockScale),
+    );
+
+    const transitionScale = getMobileTransitionScale();
+    const revealDuration = configuredNumber(
+      timingConfig.transitionRevealMs,
+      760,
+      0,
+    );
+    rootStyle.setProperty(
+      "--mouse-transition-reveal-duration",
+      `${Math.round(revealDuration * transitionScale)}ms`,
+    );
+    rootStyle.setProperty(
+      "--transition-head-pop-duration",
+      `${Math.round(820 * transitionScale)}ms`,
+    );
+    rootStyle.setProperty(
+      "--transition-copy-duration",
+      `${Math.round(800 * transitionScale)}ms`,
+    );
+    rootStyle.setProperty(
+      "--transition-copy-delay",
+      `${Math.round(900 * transitionScale)}ms`,
+    );
+    rootStyle.setProperty(
+      "--photo-scene-fade-duration",
+      `${Math.round(900 * transitionScale)}ms`,
+    );
+
+    return { ...layout, stageHeightPx: stageHeight };
+  }
+
+  function resolveMobileExperienceMode() {
+    return mobileForcedMode === null
+      ? mobileConfig.enabled !== false && mobileMediaQuery.matches
+      : Boolean(mobileForcedMode);
+  }
+
+  function refreshMobileExperience(options = {}) {
+    const previousMode = isMobileExperience;
+    isMobileExperience = resolveMobileExperienceMode();
+    document.body.classList.toggle(
+      "is-mobile-experience",
+      isMobileExperience,
+    );
+    document.body.classList.toggle(
+      "mobile-layout-debug",
+      isMobileExperience && mobileDebugEnabled,
+    );
+    document.body.classList.toggle(
+      "mobile-reduced-effects",
+      hasMobilePerformanceMode() &&
+        mobilePerformanceConfig.disableExpensiveEffects !== false,
+    );
+    const layout = applyMobileCssVariables();
+
+    if (
+      options.refreshMedia !== false &&
+      previousMode !== isMobileExperience &&
+      photoStreamBuilt
+    ) {
+      preparePhotoMediaLoading();
+      preparePhotoVideoPlayback();
+    }
+    return layout;
+  }
+
+  function applyMobileLayoutOverrides(overrides = {}) {
+    if (!overrides || typeof overrides !== "object") {
+      return getMobileDebugState();
+    }
+    const nextOverrides = { ...mobileLayoutOverrides };
+    Object.keys(mobileLayoutDefaults).forEach((key) => {
+      if (!Object.prototype.hasOwnProperty.call(overrides, key)) return;
+      const number = Number(overrides[key]);
+      if (Number.isFinite(number)) nextOverrides[key] = number;
+    });
+    mobileLayoutOverrides = nextOverrides;
+    refreshMobileExperience({ refreshMedia: false });
+    return getMobileDebugState();
+  }
+
+  function resetMobileLayoutOverrides() {
+    mobileLayoutOverrides = {};
+    refreshMobileExperience({ refreshMedia: false });
+    return getMobileDebugState();
+  }
+
+  function setMobileDebug(enabled) {
+    mobileDebugEnabled = Boolean(enabled);
+    refreshMobileExperience({ refreshMedia: false });
+    return getMobileDebugState();
+  }
+
+  function forceMobileMode(value = "auto") {
+    mobileForcedMode =
+      value === "auto" || value === null || typeof value === "undefined"
+        ? null
+        : Boolean(value);
+    refreshMobileExperience();
+    return getMobileDebugState();
+  }
+
+  function setNonCriticalWorkSuspended(value) {
+    const nextValue = Boolean(value);
+    if (nonCriticalWorkSuspended === nextValue) return;
+    nonCriticalWorkSuspended = nextValue;
+    if (nextValue) return;
+
+    const waiters = [...nonCriticalResumeWaiters];
+    nonCriticalResumeWaiters.clear();
+    waiters.forEach((resolve) => resolve());
+    if (audioPrefetchQueue.length) void drainAudioPrefetchQueue();
+  }
+
+  function waitForNonCriticalWork(priority = false) {
+    if (!nonCriticalWorkSuspended || priority) return Promise.resolve();
+    return new Promise((resolve) => {
+      nonCriticalResumeWaiters.add(resolve);
+    });
+  }
+
+  function scheduleDeferredWork(
+    callback,
+    delay = getDeferredWorkDelayMs(),
+    options = {},
+  ) {
+    const run = () => {
+      if (nonCriticalWorkSuspended && options.priority !== true) {
+        window.setTimeout(run, 320);
+        return;
+      }
+      if (
+        hasMobilePerformanceMode() &&
+        typeof window.requestIdleCallback === "function"
+      ) {
+        window.requestIdleCallback(callback, {
+          timeout: getIdleWorkTimeoutMs(),
+        });
+        return;
+      }
+      callback();
+    };
+    return window.setTimeout(run, Math.max(0, delay));
+  }
+
+  function beginSceneTransition() {
+    setNonCriticalWorkSuspended(true);
+    document.body.classList.add("is-scene-transitioning");
+    refreshPhotoVideoPlayback();
+  }
+
+  function endSceneTransition() {
+    document.body.classList.remove("is-scene-transitioning");
+    setNonCriticalWorkSuspended(false);
+    refreshPhotoVideoPlayback();
+  }
+
+  function ensurePhotoStreamBuilt() {
+    if (!photoStreamBuilt) buildPhotoStream();
+  }
+
+  function ensureGiftSparklesCreated() {
+    if (!giftSparklesBuilt) createGiftSparkles();
+  }
+
+  refreshMobileExperience({ refreshMedia: false });
   flattenBranches(branchConfig, 0);
   const branchDuration = branches.reduce(
     (max, branch) => Math.max(max, branch.delay + branch.duration),
@@ -486,14 +996,22 @@
    * 页面初始化：先准备所有场景，但只开放开场追逐爱心。
    * ---------------------------------------------------------------------- */
   createBlooms();
-  buildPhotoStream();
   renderBirthdayCard();
-  createGiftSparkles();
   drawIdle();
   initializeMusicDecks();
   exposeMusicInterface();
   registerPerformanceServiceWorker();
   startOpeningGate();
+
+  if (hasMobilePerformanceMode()) {
+    const deferredStart = getDeferredWorkDelayMs();
+    scheduleDeferredWork(ensurePhotoStreamBuilt, deferredStart);
+    scheduleDeferredWork(createTransitionHeads, deferredStart + 260);
+    scheduleDeferredWork(ensureGiftSparklesCreated, deferredStart + 520);
+  } else {
+    buildPhotoStream();
+    createGiftSparkles();
+  }
 
   // 爱心树红心的鼠标命中反馈；只有进入 idle 状态后才可点击。
   canvas.addEventListener("pointermove", (event) => {
@@ -607,10 +1125,20 @@
     }
   });
 
-  // 浏览器尺寸改变时，把移动爱心重新放回当前可见范围。
-  window.addEventListener("resize", () => {
-    if (phase === "opening") moveCatchHeart(true);
+  // 合并高频 resize：同时刷新手机布局，并把移动爱心放回可见范围。
+  function scheduleResponsiveRefresh() {
+    if (mobileResizeFrame) return;
+    mobileResizeFrame = requestAnimationFrame(() => {
+      mobileResizeFrame = 0;
+      refreshMobileExperience();
+      if (phase === "opening") moveCatchHeart(true);
+    });
+  }
+  window.addEventListener("resize", scheduleResponsiveRefresh, {
+    passive: true,
   });
+  mobileMediaQuery.addEventListener?.("change", scheduleResponsiveRefresh);
+  document.addEventListener("visibilitychange", refreshPhotoVideoPlayback);
 
   // 背景音乐开关：暂停时淡出；重新播放时默认延续当前片段。
   musicToggle.addEventListener("click", () => {
@@ -782,6 +1310,7 @@
   function setPhase(nextPhase) {
     phase = nextPhase;
     document.body.dataset.phase = nextPhase;
+    if (photoStreamBuilt) refreshPhotoVideoPlayback();
   }
 
   // 点击爱心树中央红心后，正式开始 Canvas 生长动画。
@@ -793,6 +1322,7 @@
     interactionStatus.textContent = "红心已被点击，爱心树正在生长。";
     animationStartedAt = performance.now();
     lastFrameAt = animationStartedAt;
+    lastTreeRenderAt = 0;
     requestAnimationFrame(animateSequence);
   }
 
@@ -801,6 +1331,17 @@
    */
   function animateSequence(now) {
     const elapsed = now - animationStartedAt;
+    const frameInterval = getTreeFrameIntervalMs();
+    if (
+      frameInterval > 0 &&
+      lastTreeRenderAt > 0 &&
+      now - lastTreeRenderAt < frameInterval &&
+      elapsed < sequence.moveEnd
+    ) {
+      requestAnimationFrame(animateSequence);
+      return;
+    }
+    lastTreeRenderAt = now;
     drawSequence(elapsed);
     if (elapsed < sequence.moveEnd) {
       requestAnimationFrame(animateSequence);
@@ -896,10 +1437,21 @@
 
   // 爱心树完成后持续生成少量飘落花瓣，保持画面有呼吸感。
   function animatePetals(now) {
+    if (phase !== "complete" && phase !== "invitation") return;
+
+    const frameInterval = getTreeFrameIntervalMs();
+    if (frameInterval > 0 && now - lastFrameAt < frameInterval) {
+      requestAnimationFrame(animatePetals);
+      return;
+    }
+
     const delta = Math.min((now - lastFrameAt) / 1000, 0.05);
     lastFrameAt = now;
 
-    if (now - lastPetalAt > 320 && fallingBlooms.length < 18) {
+    if (
+      now - lastPetalAt > getPetalIntervalMs() &&
+      fallingBlooms.length < getMaximumFallingPetals()
+    ) {
       const random = mulberry32(Math.floor(now) + fallingBlooms.length * 97);
       const amount = random() > 0.68 ? 2 : 1;
       for (let i = 0; i < amount; i += 1) {
@@ -943,7 +1495,9 @@
       }
     }
 
-    requestAnimationFrame(animatePetals);
+    if (phase === "complete" || phase === "invitation") {
+      requestAnimationFrame(animatePetals);
+    }
   }
 
   function drawGround(target, progress) {
@@ -1018,9 +1572,7 @@
   // 在心形范围内随机生成花朵数据；数量由 effects.treeBloomCount 控制。
   function createBlooms() {
     const random = mulberry32(20170201);
-    const targetBloomCount = Math.round(
-      configuredNumber(effectsConfig.treeBloomCount, 700, 1),
-    );
+    const targetBloomCount = getTreeBloomCount();
     let attempts = 0;
     while (
       blooms.length < targetBloomCount &&

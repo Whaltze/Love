@@ -33,6 +33,13 @@
   /* 此值会被 birthday-content.js / opening.exitDurationMs 自动覆盖。 */
   --opening-exit-duration: 760ms;
 
+  /* 手机端会由 script.js 按 mobile.performance.transitionDurationScale 覆盖。 */
+  --mouse-transition-reveal-duration: 720ms;
+  --transition-head-pop-duration: 820ms;
+  --transition-copy-duration: 800ms;
+  --transition-copy-delay: 900ms;
+  --photo-scene-fade-duration: 900ms;
+
   /* ---------- 爱心树情书 ---------- */
   --story-font-size: clamp(8px, 1.46vw, 16px);
   --story-line-height: 2;
@@ -390,6 +397,13 @@ body[data-phase="opening-caught"] {
   background: var(--paper);
 }
 
+/* 树与时间表共用此容器，手机端可整体下移、缩放而不牵动情书区域。 */
+.heart-art {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
 #loveCanvas {
   position: absolute;
   inset: 0;
@@ -414,7 +428,7 @@ body[data-phase="opening-caught"] {
   position: absolute;
   top: 11.76%;
   left: 5.45%;
-  z-index: 2;
+  z-index: 3;
   width: 36.36%;
   height: 62.5%;
   pointer-events: none;
@@ -961,7 +975,7 @@ body[data-phase="opening-caught"] {
 
 .mouse-transition.is-revealing {
   opacity: 0;
-  transition-duration: 720ms;
+  transition-duration: var(--mouse-transition-reveal-duration);
 }
 
 .mouse-transition > p {
@@ -980,7 +994,8 @@ body[data-phase="opening-caught"] {
 }
 
 .mouse-transition.is-active > p {
-  animation: transition-copy 800ms 900ms ease forwards;
+  animation: transition-copy var(--transition-copy-duration)
+    var(--transition-copy-delay) ease forwards;
 }
 
 .mouse-heads,
@@ -998,6 +1013,7 @@ body[data-phase="opening-caught"] {
   color: var(--head-color, #70464b);
   opacity: 0;
   transform: translate(-50%, -50%) rotate(var(--rotate)) scale(0);
+  will-change: transform, opacity;
 }
 
 .transition-head::before,
@@ -1028,7 +1044,7 @@ body[data-phase="opening-caught"] {
 }
 
 .mouse-transition.is-active .transition-head {
-  animation: transition-head-pop 820ms var(--delay)
+  animation: transition-head-pop var(--transition-head-pop-duration) var(--delay)
     cubic-bezier(0.17, 0.89, 0.32, 1.35) forwards;
 }
 
@@ -1050,7 +1066,7 @@ body[data-phase="opening-caught"] {
 
 .photo-scene.is-active {
   display: block;
-  animation: scene-fade-in 900ms ease both;
+  animation: scene-fade-in var(--photo-scene-fade-duration) ease both;
 }
 
 .photo-aurora {
@@ -1211,6 +1227,11 @@ body[data-phase="opening-caught"] {
 
 .photo-track.is-paused,
 .photo-track.is-dragging {
+  animation-play-state: paused;
+}
+
+/* 场景切换期间暂停胶片的持续位移动画，把主线程留给淡入淡出。 */
+body.is-scene-transitioning .photo-track {
   animation-play-state: paused;
 }
 
@@ -2106,10 +2127,10 @@ body[data-phase="opening-caught"] {
 
 @keyframes photo-flow {
   from {
-    transform: translateX(0);
+    transform: translate3d(0, 0, 0);
   }
   to {
-    transform: translateX(-50%);
+    transform: translate3d(-50%, 0, 0);
   }
 }
 
@@ -2205,6 +2226,100 @@ body[data-phase="opening-caught"] {
     opacity: 0;
     transform: translateY(-105vh) rotate(22deg) scale(1.2);
   }
+}
+
+/* ===========================================================================
+ * 手机端可调布局与性能降载
+ * 数值由 birthday-content.js / mobile 写入 CSS 变量。
+ * ======================================================================== */
+body.is-mobile-experience #stage {
+  width: 100%;
+  height: var(--mobile-stage-height, 690px);
+  min-height: var(--mobile-stage-min-height, 690px);
+  margin-top: max(52px, env(safe-area-inset-top));
+  aspect-ratio: auto;
+  overflow: hidden;
+}
+
+body.is-mobile-experience .heart-art {
+  inset: auto;
+  top: var(--mobile-heart-art-offset-y, 330px);
+  left: 50%;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1100 / 680;
+  transform: translate3d(-50%, 0, 0)
+    scale(var(--mobile-heart-art-scale, 0.84));
+  transform-origin: 50% 0;
+  backface-visibility: hidden;
+}
+
+body.is-mobile-experience .story-panel {
+  top: var(--mobile-story-top, 18px);
+  left: var(--mobile-story-side-padding, 18px);
+  width: calc(100% - var(--mobile-story-side-padding, 18px) * 2);
+  height: var(--mobile-story-reserved-height, 315px);
+  padding-right: 5px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  font-size: var(--mobile-story-font-size, 11.5px);
+  line-height: var(--mobile-story-line-height, 1.76);
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+}
+
+body.is-mobile-experience .story-panel.is-visible {
+  pointer-events: auto;
+}
+
+body.is-mobile-experience .clock-box {
+  transform: translate3d(0, var(--mobile-clock-offset-y, 0px), 0)
+    scale(var(--mobile-clock-scale, 0.92));
+  transform-origin: left top;
+}
+
+/* 地址栏加 ?mobileDebug=1，或调用 __loveExperience.mobile.setDebug(true)。 */
+body.mobile-layout-debug .story-panel {
+  outline: 2px dashed #3578e5;
+  background: rgba(53, 120, 229, 0.05);
+}
+
+body.mobile-layout-debug .heart-art {
+  outline: 2px dashed #d14b64;
+}
+
+body.mobile-layout-debug .clock-box {
+  outline: 2px dashed #d89b24;
+}
+
+/* 手机端关闭高成本模糊与持续柔光，保留淡入淡出和主要动作。 */
+body.is-mobile-experience.mobile-reduced-effects .photo-aurora {
+  filter: none;
+  animation: none;
+  opacity: 0.7;
+}
+
+body.is-mobile-experience.mobile-reduced-effects .photo-content.is-blurred {
+  filter: none;
+  transform: scale(1.01);
+  opacity: 0.72;
+}
+
+body.is-mobile-experience.mobile-reduced-effects .photo-lightbox,
+body.is-mobile-experience.mobile-reduced-effects .gift-overlay,
+body.is-mobile-experience.mobile-reduced-effects .music-toggle,
+body.is-mobile-experience.mobile-reduced-effects .film-control-hint {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+body.is-mobile-experience.mobile-reduced-effects .gift-glow {
+  filter: none;
+}
+
+body.is-mobile-experience.mobile-reduced-effects .card-portrait-halo {
+  box-shadow: 0 14px 30px rgba(91, 52, 57, 0.16);
 }
 
 /* ===========================================================================

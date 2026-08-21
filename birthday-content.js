@@ -571,6 +571,78 @@ window.BIRTHDAY_CONTENT = {
 
   /**
    * --------------------------------------------------------------------------
+   * 1.2 手机端布局与性能接口
+   * --------------------------------------------------------------------------
+   * 只在屏幕宽度不大于 breakpointPx 时生效，电脑端保持原效果。
+   * 可在浏览器地址后追加 ?mobileDebug=1 查看边界；追加 ?mobilePreview=1
+   * 可在电脑浏览器中强制预览手机配置。
+   */
+  mobile: {
+    enabled: true,
+    breakpointPx: 700,
+    debug: false,
+
+    layout: {
+      // 手机舞台最小高度；小屏高度不足时页面允许纵向滚动，不再让文案压住树。
+      stageMinHeightPx: 690,
+
+      // 情书区域的位置、预留高度和字号。
+      storyTopPx: 18,
+      storyReservedHeightPx: 315,
+      storySidePaddingPx: 18,
+      storyFontSizePx: 11.5,
+      storyLineHeight: 1.76,
+
+      // 树和时间表共用的整体下移量与缩放比例。
+      heartArtOffsetYPx: 330,
+      heartArtScale: 0.84,
+
+      // 时间表相对树的二次微调；offset 可填写负数。
+      clockOffsetYPx: 0,
+      clockScale: 0.92,
+
+      // 树与舞台底部至少保留的距离，横屏或窄屏时用于自动补足舞台高度。
+      bottomSpacePx: 84,
+    },
+
+    performance: {
+      enabled: true,
+
+      // 照片流进入时只立即挂载前几个媒体，其余继续由观察器异步加载。
+      initialPhotoCount: 3,
+      photoLoadAheadScreens: 0.65,
+      thumbnailWarmupDelayMs: 9000,
+      thumbnailBatchSize: 2,
+      thumbnailBatchGapMs: 850,
+      previewNeighborCount: 1,
+
+      // 手机网络同时只预取很小的歌曲窗口，避免音频与图片争抢带宽。
+      musicPreloadAhead: 1,
+      photoMusicPreloadAhead: 1,
+
+      // 非关键 DOM 与缓存任务尽量放到空闲时段执行。
+      deferNonCriticalMs: 900,
+      idleTimeoutMs: 1800,
+
+      // 手机端降低高频 Canvas/装饰数量；不改变歌曲、文案与点击流程。
+      treeBloomCount: 460,
+      treeTargetFps: 36,
+      maxFallingPetals: 8,
+      petalIntervalMs: 520,
+      transitionHeadRows: 6,
+      transitionHeadColumns: 8,
+      transitionHeadDelaySpreadMs: 480,
+      giftSparkleCount: 24,
+      finalFloatingHeartCount: 30,
+
+      // 缩短重叠动画时间并关闭高成本模糊；主要转场仍保留淡入淡出。
+      transitionDurationScale: 0.86,
+      disableExpensiveEffects: true,
+    },
+  },
+
+  /**
+   * --------------------------------------------------------------------------
    * 2. 爱心树与情书
    * --------------------------------------------------------------------------
    */
@@ -1036,6 +1108,10 @@ window.BIRTHDAY_CONTENT = {
       ""
     ],
     signature: "",
-    finalWish: "愿你每一个愿望，都在未来被温柔接住。",
+    finalWish: [
+      "愿你每一个愿望，都在未来被温柔接住。",
+      "回复礼物，即得贺礼！",
+      ""
+    ],
   },
 };
