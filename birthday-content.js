@@ -1014,7 +1014,7 @@ window.BIRTHDAY_CONTENT = {
    */
   card: {
     eyebrow: "FOR MY DEAREST",
-    title: "生日快乐，我最珍贵的宝贝",
+    title: "生日快乐 我的朋友",
     lines: [
       "愿你新的一岁，眼里有光，心里有梦",
       "愿所有小小的期待，都在某一天悄悄抵达",
