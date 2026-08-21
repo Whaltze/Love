@@ -80,6 +80,32 @@ window.BIRTHDAY_CONTENT = {
     // 当前片段播放到 end 后，循环回 start 时使用的淡化时长。
     fragmentLoopFadeMs: 300,
 
+    // 异地访问时的歌曲预加载与持久缓存接口。
+    loading: {
+      // 页面打开后优先缓存多少个“接下来最可能播放”的不同音频文件。
+      preloadAhead: 3,
+
+      // 进入照片场景或打开某张照片后，提前缓存后面几张照片对应的歌曲。
+      photoPreloadAhead: 3,
+
+      // 开场歌曲开始请求后，等待多久再缓存后续歌曲，避免同时抢占首曲带宽。
+      preloadDelayMs: 1800,
+
+      // 默认不下载整张歌单，避免第一次异地访问一次消耗几十 MB 流量。
+      // 只有明确需要全歌单离线缓存时才改为 true。
+      cacheWholePlaylist: false,
+
+      // cacheWholePlaylist 为 true 时，再等待多久开始串行缓存其余歌曲。
+      // 设为 0 表示即使开启 cacheWholePlaylist，也不启动整歌单后台缓存。
+      cacheRemainingAfterMs: 0,
+
+      // true：交给 Service Worker 持久缓存，刷新或下次打开仍可直接使用。
+      persistentCache: true,
+
+      // 访客开启“节省流量”时不主动下载尚未播放的歌曲。
+      skipOnSaveData: true,
+    },
+
     // “先抓住这颗心”开场页的播放接口。
     opening: {
       // true：页面打开后立即尝试播放；false：仍等用户主动点击后播放。
@@ -119,77 +145,77 @@ window.BIRTHDAY_CONTENT = {
       { // 开场封面
         id: "sakura-grass",
         title: "Sweety - 樱花草",
-        src: "./assets/audio/Sweety - 樱花草.mp3",
+        src: "./assets/audio/optimized/sakura-grass.mp3",
         start: "00:20",
         end: "04:30",
       },
       {
         id: "special-person",
         title: "方大同 - 特别的人",
-        src: "./assets/audio/方大同 - 特别的人.mp3",
+        src: "./assets/audio/optimized/special-person.mp3",
         start: "02:13",
         end: "03:55",
       },
       {
         id: "love-message",
         title: "郭静 - 爱情讯息",
-        src: "./assets/audio/郭静 - 爱情讯息.mp3",
+        src: "./assets/audio/optimized/love-message.mp3",
         start: "01:11",
         end: "01:50",
       },
       {
         id: "love-message",
         title: "郭静 - 爱情讯息",
-        src: "./assets/audio/郭静 - 爱情讯息.mp3",
+        src: "./assets/audio/optimized/love-message.mp3",
         start: "03:19",
         end: "04:10",
       },
       {
         id: "suddenly",
         title: "莫文蔚 - 忽然之间",
-        src: "./assets/audio/莫文蔚 - 忽然之间.mp3",
+        src: "./assets/audio/optimized/suddenly.mp3",
         start: "00:45",
         end: "01:13",
       },
       {
         id: "suddenly",
         title: "莫文蔚 - 忽然之间",
-        src: "./assets/audio/莫文蔚 - 忽然之间.mp3",
+        src: "./assets/audio/optimized/suddenly.mp3",
         start: "1:34",
         end: "03:35",
       },
       {
         id: "slowly-fall-for-you",
         title: "莫文蔚 - 慢慢喜欢你",
-        src: "./assets/audio/莫文蔚 - 慢慢喜欢你.mp3",
+        src: "./assets/audio/optimized/slowly-fall-for-you.mp3",
         start: "02:39",
         end: "03:13",
       },
       {
         id: "slowly-fall-for-you",
         title: "莫文蔚 - 慢慢喜欢你",
-        src: "./assets/audio/莫文蔚 - 慢慢喜欢你.mp3",
+        src: "./assets/audio/optimized/slowly-fall-for-you.mp3",
         start: "00:00",
         end: "03:13",
       },
       {
         id: "dear-you",
         title: "任素汐 - 亲爱的你啊",
-        src: "./assets/audio/任素汐 - 亲爱的你啊.mp3",
+        src: "./assets/audio/optimized/dear-you.mp3",
         start: "02:09",
         end: "02:30",
       },
       {
         id: "dear-you",  // 开场爱心树
         title: "任素汐 - 亲爱的你啊",
-        src: "./assets/audio/任素汐 - 亲爱的你啊.mp3",
+        src: "./assets/audio/optimized/dear-you.mp3",
         start: "00:00",
         end: "03:50",
       },
       {
         id: "what-i-miss",
         title: "孙燕姿 - 我怀念的",
-        src: "./assets/audio/孙燕姿 - 我怀念的.mp3",
+        src: "./assets/audio/optimized/what-i-miss.mp3",
         start: "02:21",
         end: "04:42",
       },
@@ -197,9 +223,135 @@ window.BIRTHDAY_CONTENT = {
       {
         id: "sakura-grass",
         title: "Sweety - 樱花草",
-        src: "./assets/audio/Sweety - 樱花草.mp3",
+        src: "./assets/audio/optimized/sakura-grass.mp3",
         start: "02:38",
         end: "04:30",
+      },
+      {
+        id: "another-me-in-world",
+        title: "阿肆, 郭采洁 - 世界上的另一个我",
+        src: "./assets/audio/optimized/another-me-in-world.mp3",
+        start: "00:17",
+        end: null,
+      },
+      {
+        id: "beauty-around-you",
+        title: "柏松 - 世间美好与你环环相扣",
+        src: "./assets/audio/optimized/beauty-around-you.mp3",
+        start: "00:57",
+        end: null,
+      },
+      {
+        id: "thief-of-time",
+        title: "金玟岐 - 岁月神偷",
+        src: "./assets/audio/optimized/thief-of-time.mp3",
+        start: "00:47",
+        end: null,
+      },
+      {
+        id: "so-many-people",
+        title: "莫文蔚 - 这世界那么多人",
+        src: "./assets/audio/optimized/so-many-people.mp3",
+        start: "01:39",
+        end: null,
+      },
+      {
+        id: "green-light",
+        title: "孙燕姿 - 绿光",
+        src: "./assets/audio/optimized/green-light.mp3",
+        start: "00:14",
+        end: null,
+      },
+      {
+        id: "encounter",
+        title: "孙燕姿 - 遇见",
+        src: "./assets/audio/optimized/encounter.mp3",
+        start: "01:14",
+        end: null,
+      },
+      {
+        id: "love-be-frank",
+        title: "萧潇 - 爱要坦荡荡",
+        src: "./assets/audio/optimized/love-be-frank.mp3",
+        start: "00:15",
+        end: null,
+      },
+      {
+        id: "what-can-not",
+        title: "许嵩 - 有何不可",
+        src: "./assets/audio/optimized/what-can-not.mp3",
+        start: "00:22",
+        end: null,
+      },
+      {
+        id: "side-face",
+        title: "于果 - 侧脸",
+        src: "./assets/audio/optimized/side-face.mp3",
+        start: "00:40",
+        end: null,
+      },
+      {
+        id: "he-doesnt-understand",
+        title: "张杰 - 他不懂",
+        src: "./assets/audio/optimized/he-doesnt-understand.mp3",
+        start: "00:44",
+        end: null,
+      },
+      {
+        id: "big-big-world",
+        title: "Emilia - Big Big World",
+        src: "./assets/audio/optimized/big-big-world.mp3",
+        start: "00:04",
+        end: null,
+      },
+      {
+        id: "together-no-matter-how-far",
+        title: "G.E.M.邓紫棋 - 多远都要在一起",
+        src: "./assets/audio/optimized/together-no-matter-how-far.mp3",
+        start: "00:48",
+        end: null,
+      },
+      {
+        id: "full-stop",
+        title: "G.E.M.邓紫棋 - 句号",
+        src: "./assets/audio/optimized/full-stop.mp3",
+        start: "00:06",
+        end: null,
+      },
+      {
+        id: "i-wanted-you",
+        title: "Ina Wroldsen - I wanted you",
+        src: "./assets/audio/optimized/i-wanted-you.mp3",
+        start: "00:18",
+        end: null,
+      },
+      {
+        id: "famous",
+        title: "Ivy Adara - Famous",
+        src: "./assets/audio/optimized/famous.mp3",
+        start: "00:00",
+        end: null,
+      },
+      {
+        id: "lucky",
+        title: "Lenka - Lucky",
+        src: "./assets/audio/optimized/lucky.mp3",
+        start: "00:00",
+        end: null,
+      },
+      {
+        id: "love-story",
+        title: "Taylor Swift - Love Story",
+        src: "./assets/audio/optimized/love-story.mp3",
+        start: "00:14",
+        end: null,
+      },
+      {
+        id: "summer-vibe",
+        title: "Walk off the Earth - Summer Vibe",
+        src: "./assets/audio/optimized/summer-vibe.mp3",
+        start: "00:45",
+        end: null,
       },
     ],
 
@@ -214,26 +366,155 @@ window.BIRTHDAY_CONTENT = {
 
       // 【一起许愿】
       // 米老鼠出现后，点击“一起许愿”按钮。
-      wishButton: "NEXT",
+      wishButton: 7,
 
       // 【照片流照片——这一个就是点击照片切歌的接口】
       // 点击照片流中的任意照片、打开照片大图时触发。
       // photoCard: "NEXT",
       photoCard: [
-        {
+
+        { // "方大同 - 特别的人
           track: "special-person",
           start: "02:13",
           end: "03:55",
         },
-        {
-          track: "slowly-fall-for-you",
-          start: "02:39",
-          end: "03:13",
-        },
-        {
+
+        // { //  "莫文蔚 - 慢慢喜欢你"
+        //   track: "slowly-fall-for-you",
+        //   start: "02:39",
+        //   end: "03:13",
+        // },
+
+        { // Sweety - 樱花草
           track: "sakura-grass",
           start: "02:38",
           end: "04:30",
+        },
+
+         // 1. 阿肆, 郭采洁 - 世界上的另一个我
+        {
+          track: "another-me-in-world",
+          start: "00:17",
+          end: null,
+        },
+
+        // 2. 柏松 - 世间美好与你环环相扣
+        {
+          track: "beauty-around-you",
+          start: "00:57",
+          end: null,
+        },
+
+        // 3. 金玟岐 - 岁月神偷
+        {
+          track: "thief-of-time",
+          start: "00:47",
+          end: null,
+        },
+
+        // 4. 莫文蔚 - 这世界那么多人
+        {
+          track: "so-many-people",
+          start: "01:39",
+          end: null,
+        },
+
+        // 5. 孙燕姿 - 绿光
+        {
+          track: "green-light",
+          start: "00:14",
+          end: null,
+        },
+
+        // 6. 孙燕姿 - 遇见
+        {
+          track: "encounter",
+          start: "01:14",
+          end: null,
+        },
+
+        // 7. 萧潇 - 爱要坦荡荡
+        {
+          track: "love-be-frank",
+          start: "00:15",
+          end: null,
+        },
+
+        // 8. 许嵩 - 有何不可
+        {
+          track: "what-can-not",
+          start: "00:22",
+          end: null,
+        },
+
+        // 9. 于果 - 侧脸
+        {
+          track: "side-face",
+          start: "00:40",
+          end: null,
+        },
+
+        // 10. 张杰 - 他不懂
+        {
+          track: "he-doesnt-understand",
+          start: "00:44",
+          end: null,
+        },
+
+        // 11. Emilia - Big Big World
+        {
+          track: "big-big-world",
+          start: "00:04",
+          end: null,
+        },
+
+        // 12. G.E.M.邓紫棋 - 多远都要在一起
+        {
+          track: "together-no-matter-how-far",
+          start: "00:48",
+          end: null,
+        },
+
+        // 13. G.E.M.邓紫棋 - 句号
+        {
+          track: "full-stop",
+          start: "00:06",
+          end: null,
+        },
+
+        // 14. Ina Wroldsen - I wanted you
+        {
+          track: "i-wanted-you",
+          start: "00:18",
+          end: null,
+        },
+
+        // 15. Ivy Adara - Famous
+        {
+          track: "famous",
+          start: "00:00",
+          end: null,
+        },
+
+        // 16. Lenka - Lucky
+        {
+          track: "lucky",
+          start: "00:00",
+          end: null,
+        },
+
+        // 17. Taylor Swift - Love Story
+        {
+          track: "love-story",
+          start: "00:14",
+          end: null,
+        },
+
+        // 18. Walk off the Earth - Summer Vibe
+        {
+          track: "summer-vibe",
+          start: "00:45",
+          end: null,
         },
       ],
 
@@ -266,21 +547,46 @@ window.BIRTHDAY_CONTENT = {
 
   /**
    * --------------------------------------------------------------------------
+   * 1.1 网页资源加载优化
+   * --------------------------------------------------------------------------
+   * 这些参数只影响加载时机，不改变照片顺序、文案或动画效果。
+   */
+  loading: {
+    // true：启用 sw.js 持久缓存；部署到 GitHub Pages / 自定义域名时建议保持开启。
+    serviceWorker: true,
+
+    // 照片进入可视区域前，提前多少个屏幕宽度开始加载缩略图。
+    photoLoadAheadScreens: 1.25,
+
+    // 页面打开后多久开始在后台串行缓存全部照片流缩略图。
+    thumbnailWarmupDelayMs: 4500,
+
+    // 打开一张照片时，额外预取前后各几张放大预览图。
+    previewNeighborCount: 1,
+
+    // 访客开启“节省流量”时，不主动缓存未显示的照片缩略图。
+    skipOnSaveData: true,
+  },
+
+  /**
+   * --------------------------------------------------------------------------
    * 2. 爱心树与情书
    * --------------------------------------------------------------------------
    */
   story: {
     // 打字机每个汉字出现的间隔。越小越快；建议范围：35～110。
-    characterDelayMs: 75,
+    characterDelayMs: 120,
 
     // 文字全部显示完后，米老鼠再等待多久出现。
     invitationDelayMs: 600,
 
     // 情书正文。使用 \n 表示换行，\n\n 表示空一行。
     copy:
-      "亲爱的宝贝：\n\n" +
-      "　　你不开心的时候，我陪你，你哭泣的时候，我陪你，你心情很不爽的时候，我陪你，你不想回家的时候，我陪你，无论怎样，我都陪你，只因为你是我最爱的人，你就是我的音乐，你给我带来好听的音符。你是我的全部，你给我生命带来了色彩。\n\n" +
-      " ",
+        "To M.J.：\n\n" +
+        // "　　人海茫茫，我们有幸相逢，从初识到相知。一同拥有过无数温柔美好的瞬间，历经误会，短暂别离。这个页面删删减减，多次改版每次意义不同！既是珍藏回忆，更是美好期许，命运兜兜转转，缘分让我们回到彼此身旁。往后岁岁朝朝，只想紧紧牵着你的手，共同奔赴万千世界。\n\n"+
+        "　　20岁，一个人生奇特的转折点。褪去十八岁的青涩，却又鲜有那份成熟。20岁是青春，更是力量！一段充满挣扎与考验的时光，一段自我沉淀迅速成长的年纪。非常有幸作为你人生的一位摆渡人，一起披荆斩棘，寻找彼岸。诚然过程似乎并不如想象般美好，从信封到网页，故事的意义发生了变化，但很高兴故事的结尾并没止步于此，命运兜兜转转，好巧认识你 ~ \n       无论如何，希望我们仍是最好的朋友，一位从呱呱落地6.6kg，到如今奋斗了7304天的好朋友！ \n"+
+        // "　　无论如何，希望我们仍是最好的朋友，一位从呱呱落地6.6kg，到如今奋斗了7304天的好朋友！\n\n"+
+        "　　祝生日快乐！",
   },
 
   /**
@@ -289,7 +595,7 @@ window.BIRTHDAY_CONTENT = {
    * 注意：JavaScript 的月份从 0 开始，1 代表二月。
    */
   relationship: {
-    startedAt: [2005, 8, 22, 0, 0, 0, 2],
+    startedAt: [2006, 7, 22, 20, 0, 0, 0],
   },
 
   /**
@@ -366,14 +672,18 @@ window.BIRTHDAY_CONTENT = {
    * --------------------------------------------------------------------------
    *
    * 如何继续添加很多张照片：
-   * 1. 把图片复制到 photos 文件夹。
-   * 2. 复制下面任意一个完整的 { ... } 照片对象。
-   * 3. 粘贴到 photos 数组末尾，确保前一个对象结尾保留逗号。
-   * 4. 修改 src、alt、top、bottom；视频还可以设置 type、poster、loop。
+   * 1. 把原图复制到 photos 文件夹。
+   * 2. 另外生成一张小缩略图和一张中等尺寸预览图，分别放进
+   *    assets/media/thumbs 与 assets/media/previews，避免异地访问直接下载大原图。
+   * 3. 复制下面任意一个完整的 { ... } 照片对象。
+   * 4. 粘贴到 photos 数组末尾，确保前一个对象结尾保留逗号。
+   * 5. 修改 src、thumbnail、preview、alt、top、bottom；视频可设置 type、poster、loop。
    *
    * 示例：
    * {
-   *   src: "./photos/photo-07.jpg",
+   *   src: "./photos/photo-07.jpg",                 // 原图，只作为保留接口
+   *   thumbnail: "./assets/media/thumbs/photo-07.jpg", // 照片流小图
+   *   preview: "./assets/media/previews/photo-07.jpg", // 点击放大时加载
    *   alt: "第七张生日回忆照片",
    *   top: "照片上方的文字。",
    *   bottom: "照片下方的文字。",
@@ -533,12 +843,16 @@ window.BIRTHDAY_CONTENT = {
   photos: [
     {
       src: "./photos/photos (10).jpg",
+      thumbnail: "./assets/media/thumbs/photo-01.jpg",
+      preview: "./assets/media/previews/photo-01.jpg",
       alt: "",
       top: "不必费力追逐浪漫，你本身 便是 醉美 风景！",
       bottom: "陪伴是最长情的告白，余生，只想与你相伴"
     },
     {
       src: "./photos/photos (4).jpg",
+      thumbnail: "./assets/media/thumbs/photo-02.jpg",
+      preview: "./assets/media/previews/photo-02.jpg",
       alt: "",
       top: "再忙碌的日子，也要记得给一日三餐留一点温柔的余地",
       bottom: "好好照顾那个  我曾在意过无数遍的你。"
@@ -546,72 +860,97 @@ window.BIRTHDAY_CONTENT = {
 
     {
       src: "./photos/photos (8).jpg",
+      thumbnail: "./assets/media/thumbs/photo-03.jpg",
+      preview: "./assets/media/previews/photo-03.jpg",
       alt: "",
       top: "风吹过裙摆的刹那，定格了季节的轻盈",
       bottom: "故事还长，我们慢慢讲给岁月听。"
     },
     {
       src: "./photos/mv1.mp4",
+      type: "video",
+      muted: true,
+      poster: "./assets/media/thumbs/video-04.jpg",
       alt: "",
       top: "第一次把平凡的日子，认真地收进记忆里",
       bottom: "原来幸福就是，回头时 你一直都在"
     },
     {
       src: "./photos/photos (14).jpg",
+      thumbnail: "./assets/media/thumbs/photo-05.jpg",
+      preview: "./assets/media/previews/photo-05.jpg",
       alt: "",
       top: "何其有幸与你相伴一程，往后人间风月，我们一同览尽。",
       bottom: "前路漫漫岁岁安然，陪你永远清澈，永远热烈勇敢鲜活。"
     },
     {
       src: "./photos/photos9.jpg",
+      thumbnail: "./assets/media/thumbs/photo-06.jpg",
+      preview: "./assets/media/previews/photo-06.jpg",
       alt: "",
       top: "烛光摇曳，眼底尽揽浩瀚星河",
       bottom: "你许下的每一个愿望，我都愿倾尽温柔实现"
     },
     {
       src: "./photos/photos (16).jpg",
+      thumbnail: "./assets/media/thumbs/photo-07.jpg",
+      preview: "./assets/media/previews/photo-07.jpg",
       alt: "",
       top: "与你共享过的欢喜，会在心底久久滚烫，不曾消散",
       bottom: "美好期许，慢慢兑现。"
     },
     {
       src: "./photos/photos (9).jpg",
+      thumbnail: "./assets/media/thumbs/photo-08.jpg",
+      preview: "./assets/media/previews/photo-08.jpg",
       alt: "",
       top: "把平凡细碎的朝夕，珍藏进我们的回忆",
       bottom: "蓦然回首，身旁始终是你"
     },
     {
       src: "./photos/2.jpg",
+      thumbnail: "./assets/media/thumbs/photo-09.jpg",
+      preview: "./assets/media/previews/photo-09.jpg",
       alt: "",
       top: "今晚月色真美。",
       bottom: "风也温柔，我很想你"
     },
     {
       src: "./photos/photos (2).jpg",
+      thumbnail: "./assets/media/thumbs/photo-10.jpg",
+      preview: "./assets/media/previews/photo-10.jpg",
       alt: "",
       top: "一起走过的路，连风景都有了特别的名字",
       bottom: "下一站、下下一站，也想继续陪你抵达"
     },
     {
       src: "./photos/photos (11).jpg",
+      thumbnail: "./assets/media/thumbs/photo-11.jpg",
+      preview: "./assets/media/previews/photo-11.jpg",
       alt: "",
       top: "照片会褪色，但被爱着的感觉不会",
       bottom: "愿新的一岁，仍有花、星光和好多好多爱"
     },
     {
       src: "./photos/photos (7).jpg",
+      thumbnail: "./assets/media/thumbs/photo-12.jpg",
+      preview: "./assets/media/previews/photo-12.jpg",
       alt: "",
       top: "那些没有准备的瞬间，后来都成了珍藏",
       bottom: "爱把普通的一天，变成值得纪念的一天"
     },
     {
       src: "./photos/photos (5).jpg",
+      thumbnail: "./assets/media/thumbs/photo-13.jpg",
+      preview: "./assets/media/previews/photo-13.jpg",
       alt: "",
       top: "书页翻过岁岁光阴，也见证着闪闪发光的你不断成长。",
       bottom: "永远保有对世界的热忱好奇，活成自己的太阳。"
     },
     {
       src: "./photos/肖像大头照.jpg",
+      thumbnail: "./assets/media/thumbs/photo-14.jpg",
+      preview: "./assets/media/previews/photo-14.jpg",
       alt: "",
       top: "有你分享的快乐，总会在心里停留得更久。",
       bottom: "把今天的愿望，交给明天慢慢实现。"
@@ -619,18 +958,24 @@ window.BIRTHDAY_CONTENT = {
     {  //     top: "走过四季的更迭，才懂得最美的诗句就在眼前。",
   //     bottom: "岁岁年年，万喜万般宜，只要始终是你。"
       src: "./photos/photos (6).jpg",
+      thumbnail: "./assets/media/thumbs/photo-15.jpg",
+      preview: "./assets/media/previews/photo-15.jpg",
       alt: "",
       top: "四季更迭，饱览最美诗篇。",
       bottom: "岁岁年年，只要是你，始终是你"
     },
     {
       src: "./photos/photos (1).jpg",
+      thumbnail: "./assets/media/thumbs/photo-16.jpg",
+      preview: "./assets/media/previews/photo-16.jpg",
       alt: "",
       top: "光落在脸上的时候，时间也变得很温柔。",
       bottom: "愿往后的每一次快门，都有我们的笑容。"
     },
     {
       src: "./photos/photos (12).jpg",
+      thumbnail: "./assets/media/thumbs/photo-17.jpg",
+      preview: "./assets/media/previews/photo-17.jpg",
       alt: "",
       top: "见过无数落日晚霞，唯独对你满心牵挂",
       bottom: "愿往后所有的美好，都奔赴向你而来"
@@ -638,6 +983,8 @@ window.BIRTHDAY_CONTENT = {
 
     {
       src: "./photos/portrait-full.jpg",
+      thumbnail: "./assets/media/thumbs/photo-18.jpg",
+      preview: "./assets/media/previews/photo-18.jpg",
       alt: "",
       top: "倘若偶尔疲惫迷茫也没关系，我便是你的港湾与归处",
       bottom: "愿你拥有披荆斩棘的底气，亦拥有放松倾诉的宁静"
@@ -645,6 +992,8 @@ window.BIRTHDAY_CONTENT = {
 
     {
       src: "./photos/photos (15).jpg",
+      thumbnail: "./assets/media/thumbs/photo-19.jpg",
+      preview: "./assets/media/previews/photo-19.jpg",
       alt: "",
       top: "往后山河远阔不必独行，我会伴你沿途共赏人间花香。",
       bottom: "愿日子热烈丰盈，世间所有美好热忱，我们一同共享。"

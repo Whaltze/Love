@@ -15,6 +15,12 @@
       content="从爱心树到生日愿望、照片流与惊喜礼物的浪漫。"
     />
     <title>MJ 生日快乐！</title>
+    <link
+      rel="preload"
+      href="./assets/audio/optimized/sakura-grass.mp3"
+      as="audio"
+      type="audio/mpeg"
+    />
     <link rel="stylesheet" href="./style.css" />
   </head>
   <body data-phase="opening">
@@ -92,7 +98,7 @@
         <!-- 相识日期在 birthday-content.js 的 relationship.startedAt 中修改。 -->
         <div id="clockBox" class="clock-box" aria-live="off">
           <div class="clock-heading">
-            爸爸<span> 与 </span>宝贝<span> 已经相识了</span>
+            距离破壳日<span>  </span><span> </span>
           </div>
           <div id="clock"></div>
         </div>
@@ -119,7 +125,7 @@
           />
           <div class="speech-bubble">
             <span class="speech-kicker">嘘，故事还没有结束……</span>
-            <p>现在跟我一起许下生日愿望吧~</p>
+            <p>跟着米奇一起~</p>
             <button id="wishButton" class="warm-button" type="button">
               一起许愿
               <span aria-hidden="true">✦</span>
@@ -218,7 +224,7 @@
       <article class="lightbox-card">
         <p id="lightboxTopCaption" class="lightbox-caption lightbox-caption-top"></p>
         <div id="lightboxFrame" class="lightbox-frame">
-          <img id="lightboxImage" class="lightbox-image" alt="" />
+          <img id="lightboxImage" class="lightbox-image" alt="" decoding="async" />
           <!--
             MP4 / WebM 点击放大后使用此播放器。
             controls 提供播放、暂停、进度和全屏按钮；默认仍会静音循环播放。
@@ -276,6 +282,8 @@
               class="gift-card-portrait"
               src="./assets/portrait-headwear-cutout.png"
               alt=""
+              loading="lazy"
+              decoding="async"
             />
           </div>
           <span class="card-tape" aria-hidden="true"></span>

@@ -134,6 +134,14 @@
   const timingConfig = birthdayContent.timing || {};
   const effectsConfig = birthdayContent.effects || {};
   const musicConfig = birthdayContent.music || {};
+  const loadingConfig =
+    birthdayContent.loading && typeof birthdayContent.loading === "object"
+      ? birthdayContent.loading
+      : {};
+  const musicLoadingConfig =
+    musicConfig.loading && typeof musicConfig.loading === "object"
+      ? musicConfig.loading
+      : {};
 
   /**
    * 统一读取数字配置：若用户误填文字或负数，则使用默认值。
@@ -143,6 +151,43 @@
     const number = Number(value);
     return Number.isFinite(number) ? Math.max(minimum, number) : fallback;
   }
+
+  // 异步加载和持久缓存参数，均可在 birthday-content.js / loading 中调整。
+  const serviceWorkerEnabled = loadingConfig.serviceWorker !== false;
+  const photoLoadAheadScreens = configuredNumber(
+    loadingConfig.photoLoadAheadScreens,
+    1.25,
+    0,
+  );
+  const photoThumbnailWarmupDelayMs = configuredNumber(
+    loadingConfig.thumbnailWarmupDelayMs,
+    4500,
+    0,
+  );
+  const photoPreviewNeighborCount = Math.round(
+    configuredNumber(loadingConfig.previewNeighborCount, 1, 0),
+  );
+  const photoSkipOnSaveData = loadingConfig.skipOnSaveData !== false;
+  const musicPreloadAhead = Math.round(
+    configuredNumber(musicLoadingConfig.preloadAhead, 3, 0),
+  );
+  const musicPhotoPreloadAhead = Math.round(
+    configuredNumber(musicLoadingConfig.photoPreloadAhead, 3, 0),
+  );
+  const musicPreloadDelayMs = configuredNumber(
+    musicLoadingConfig.preloadDelayMs,
+    1800,
+    0,
+  );
+  const musicCacheWholePlaylist =
+    musicLoadingConfig.cacheWholePlaylist === true;
+  const musicCacheRemainingAfterMs = configuredNumber(
+    musicLoadingConfig.cacheRemainingAfterMs,
+    0,
+    0,
+  );
+  const musicPersistentCache = musicLoadingConfig.persistentCache !== false;
+  const musicSkipOnSaveData = musicLoadingConfig.skipOnSaveData !== false;
 
   // 音乐动作保留符号；在 birthday-content.js / music.actions 中直接使用。
   const MUSIC_NEXT = "NEXT";
@@ -403,6 +448,7 @@
   let giftOpened = false;
   let floatingHeartsCreated = false;
   let lightboxReturnTarget = null;
+  let lightboxMediaToken = 0;
   let photoPointerId = null;
   let photoPointerStartX = 0;
   let photoPointerStartY = 0;
@@ -411,6 +457,16 @@
   let photoTrackDragging = false;
   let suppressNextPhotoClick = false;
   let filmHintTimer = 0;
+  let photoMediaObserver = null;
+  let photoThumbnailWarmupTimer = 0;
+  let musicPreloadTimer = 0;
+  let musicPreloadAllTimer = 0;
+  let imagePrefetchQueue = Promise.resolve();
+  const audioPrefetchQueue = [];
+  let audioPrefetchRunning = false;
+  const pendingAudioPrefetchJobs = new Map();
+  let serviceWorkerRegistrationPromise = null;
+  const prefetchedMediaUrls = new Set();
   const sceneTimers = new Set();
 
   flattenBranches(branchConfig, 0);
@@ -436,6 +492,7 @@
   drawIdle();
   initializeMusicDecks();
   exposeMusicInterface();
+  registerPerformanceServiceWorker();
   startOpeningGate();
 
   // 爱心树红心的鼠标命中反馈；只有进入 idle 状态后才可点击。
@@ -516,8 +573,10 @@
     triggerMusicAction("photoLightboxClose");
     closePhotoLightbox();
   });
-  lightboxImage.addEventListener("error", showLightboxPlaceholder);
-  lightboxVideo.addEventListener("error", showLightboxPlaceholder);
+  lightboxImage.addEventListener("load", handleLightboxImageLoad);
+  lightboxImage.addEventListener("error", handleLightboxMediaError);
+  lightboxVideo.addEventListener("loadeddata", handleLightboxVideoLoad);
+  lightboxVideo.addEventListener("error", handleLightboxMediaError);
 
   /**
    * 照片流操作：
@@ -1147,6 +1206,8 @@
     setPhase("photos");
     interactionStatus.textContent =
       "进入回忆流场景，照片和视频会从右向左缓缓经过，并显示上下文字说明。";
+    activatePhotoMediaLoading();
+    prefetchPhotoMusicWindow(0);
 
     scheduleScene(
       () => {
@@ -1286,6 +1347,529 @@
       });
       photoTrack.append(set);
     }
+    preparePhotoMediaLoading();
+  }
+
+  function preparePhotoMediaLoading() {
+    photoMediaObserver?.disconnect();
+    photoMediaObserver = null;
+
+    const pendingMedia = [...photoTrack.querySelectorAll("[data-photo-src]")];
+    if (!("IntersectionObserver" in window)) {
+      pendingMedia.forEach(loadDeferredPhotoMedia);
+      schedulePhotoThumbnailWarmup();
+      return;
+    }
+
+    const horizontalMargin = Math.round(photoLoadAheadScreens * 100);
+    photoMediaObserver = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) return;
+          loadDeferredPhotoMedia(entry.target);
+          photoMediaObserver?.unobserve(entry.target);
+        });
+      },
+      {
+        root: filmWindow,
+        rootMargin: "40px " + horizontalMargin + "% 40px " + horizontalMargin + "%",
+        threshold: 0.01,
+      },
+    );
+    pendingMedia.forEach((media) => photoMediaObserver.observe(media));
+    schedulePhotoThumbnailWarmup();
+  }
+
+  function activatePhotoMediaLoading() {
+    const media = [...photoTrack.querySelectorAll("[data-photo-src]")];
+    media.slice(0, Math.min(6, media.length)).forEach((item) => {
+      loadDeferredPhotoMedia(item);
+      photoMediaObserver?.unobserve(item);
+    });
+  }
+
+  function schedulePhotoThumbnailWarmup() {
+    window.clearTimeout(photoThumbnailWarmupTimer);
+    if (shouldSkipBackgroundPrefetch(photoSkipOnSaveData)) return;
+    photoThumbnailWarmupTimer = window.setTimeout(() => {
+      const thumbnailUrls = getConfiguredPhotos()
+        .map((photo) => getPhotoThumbnailSource(photo))
+        .filter(Boolean);
+      queueMediaPrefetch(thumbnailUrls, "image");
+    }, photoThumbnailWarmupDelayMs);
+  }
+
+  function loadDeferredPhotoMedia(media) {
+    if (!(media instanceof HTMLElement) || media.dataset.loaded === "true") return;
+    const source = media.dataset.photoSrc || "";
+    if (!source) return;
+    media.dataset.loaded = "true";
+    media.removeAttribute("data-photo-src");
+    if (media instanceof HTMLVideoElement) {
+      media.src = source;
+      media.load();
+    } else if (media instanceof HTMLImageElement) {
+      media.src = source;
+    }
+  }
+
+  function getConfiguredPhotos() {
+    return Array.isArray(birthdayContent.photos) ? birthdayContent.photos : [];
+  }
+
+  function getPhotoThumbnailSource(photo) {
+    if (!photo || typeof photo !== "object") return "";
+    const thumbnail =
+      typeof photo.thumbnail === "string" ? photo.thumbnail.trim() : "";
+    const poster = typeof photo.poster === "string" ? photo.poster.trim() : "";
+    const source = typeof photo.src === "string" ? photo.src.trim() : "";
+    return thumbnail || poster || source;
+  }
+
+  function getPhotoPreviewSource(photo) {
+    if (!photo || typeof photo !== "object") return "";
+    const preview = typeof photo.preview === "string" ? photo.preview.trim() : "";
+    const source = typeof photo.src === "string" ? photo.src.trim() : "";
+    return preview || source;
+  }
+
+  function prefetchPhotoPreview(photo) {
+    if (shouldSkipBackgroundPrefetch(photoSkipOnSaveData)) return;
+    const source = getPhotoPreviewSource(photo);
+    if (source) queueMediaPrefetch([source], "image");
+  }
+
+  function prefetchNeighborPhotoPreviews(index) {
+    if (
+      photoPreviewNeighborCount <= 0 ||
+      shouldSkipBackgroundPrefetch(photoSkipOnSaveData)
+    ) {
+      return;
+    }
+    const photos = getConfiguredPhotos();
+    if (!photos.length) return;
+    const urls = [];
+    for (let offset = 1; offset <= photoPreviewNeighborCount; offset += 1) {
+      const previous = photos[positiveModulo(index - offset, photos.length)];
+      const next = photos[positiveModulo(index + offset, photos.length)];
+      urls.push(getPhotoPreviewSource(previous), getPhotoPreviewSource(next));
+    }
+    queueMediaPrefetch(urls.filter(Boolean), "image");
+  }
+
+  // 访客主动开启“节省流量”后，不在后台抢先下载尚未查看的素材。
+  function shouldSkipBackgroundPrefetch(skipOnSaveData) {
+    if (!skipOnSaveData) return false;
+    const connection =
+      navigator.connection ||
+      navigator.mozConnection ||
+      navigator.webkitConnection;
+    return connection?.saveData === true;
+  }
+
+  // 注册持久缓存。file:// 本地直开或不支持 Service Worker 时会静默回退。
+  function registerPerformanceServiceWorker() {
+    if (serviceWorkerRegistrationPromise) {
+      return serviceWorkerRegistrationPromise;
+    }
+
+    const canRegister =
+      serviceWorkerEnabled &&
+      "serviceWorker" in navigator &&
+      (window.location.protocol === "https:" ||
+        window.location.hostname === "localhost" ||
+        window.location.hostname === "127.0.0.1");
+
+    if (!canRegister) {
+      serviceWorkerRegistrationPromise = Promise.resolve(null);
+      return serviceWorkerRegistrationPromise;
+    }
+
+    serviceWorkerRegistrationPromise = navigator.serviceWorker
+      .register("./sw.js", {
+        scope: "./",
+        updateViaCache: "none",
+      })
+      .catch(() => null);
+    return serviceWorkerRegistrationPromise;
+  }
+
+  function normalizeMediaUrl(source) {
+    if (typeof source !== "string" || !source.trim()) return "";
+    try {
+      return new URL(source.trim(), document.baseURI).href;
+    } catch {
+      return "";
+    }
+  }
+
+  /**
+   * 图片和音频使用两条独立串行队列：小缩略图不会被几 MB 的歌曲阻塞，
+   * 同一 URL 只下载一次。音频队列支持 priority，用户即将点击的歌曲可越过
+   * 尚未开始的整歌单后台任务；当前正在下载的单个文件不会被粗暴中断。
+   */
+  function queueMediaPrefetch(sources, mediaType = "image", options = {}) {
+    const sourceList = Array.isArray(sources) ? sources : [sources];
+    const normalizedType = mediaType === "audio" ? "audio" : "image";
+
+    if (normalizedType === "audio") {
+      const priority = options?.priority === true;
+      const queuedJobs = [];
+
+      sourceList.forEach((source) => {
+        const url = normalizeMediaUrl(source);
+        if (!url) return;
+
+        const pendingJob = pendingAudioPrefetchJobs.get(url);
+        if (pendingJob) {
+          if (priority) {
+            const pendingIndex = audioPrefetchQueue.indexOf(pendingJob);
+            if (pendingIndex >= 0) {
+              audioPrefetchQueue.splice(pendingIndex, 1);
+              queuedJobs.push(pendingJob);
+            }
+          }
+          return;
+        }
+
+        if (prefetchedMediaUrls.has(url)) return;
+        prefetchedMediaUrls.add(url);
+        const job = { url };
+        pendingAudioPrefetchJobs.set(url, job);
+        queuedJobs.push(job);
+      });
+
+      if (queuedJobs.length) {
+        if (priority) {
+          audioPrefetchQueue.unshift(...queuedJobs);
+        } else {
+          audioPrefetchQueue.push(...queuedJobs);
+        }
+        void drainAudioPrefetchQueue();
+      }
+      return Promise.resolve();
+    }
+
+    let queue = imagePrefetchQueue;
+    sourceList.forEach((source) => {
+      const url = normalizeMediaUrl(source);
+      if (!url || prefetchedMediaUrls.has(url)) return;
+      prefetchedMediaUrls.add(url);
+      queue = queue
+        .then(() => prefetchSingleMediaUrl(url, normalizedType))
+        .catch(() => {
+          prefetchedMediaUrls.delete(url);
+        });
+    });
+
+    imagePrefetchQueue = queue;
+    return queue;
+  }
+
+  async function drainAudioPrefetchQueue() {
+    if (audioPrefetchRunning) return;
+    audioPrefetchRunning = true;
+
+    try {
+      while (audioPrefetchQueue.length) {
+        const job = audioPrefetchQueue.shift();
+        pendingAudioPrefetchJobs.delete(job.url);
+        try {
+          await prefetchSingleMediaUrl(job.url, "audio");
+        } catch {
+          prefetchedMediaUrls.delete(job.url);
+        }
+      }
+    } finally {
+      audioPrefetchRunning = false;
+      if (audioPrefetchQueue.length) void drainAudioPrefetchQueue();
+    }
+  }
+
+  async function prefetchSingleMediaUrl(url, mediaType) {
+    const usePersistentWorker =
+      serviceWorkerEnabled &&
+      (mediaType !== "audio" || musicPersistentCache);
+
+    if (usePersistentWorker && (await cacheUrlWithServiceWorker(url))) {
+      return true;
+    }
+
+    const response = await fetch(url, {
+      cache: "force-cache",
+      credentials: "same-origin",
+    });
+    if (!response.ok && response.type !== "opaque") {
+      throw new Error("Media prefetch failed: " + response.status);
+    }
+    await response.arrayBuffer();
+    return true;
+  }
+
+  async function getReadyPerformanceWorker() {
+    const registration = await registerPerformanceServiceWorker();
+    if (!registration) return null;
+    if (navigator.serviceWorker.controller) {
+      return navigator.serviceWorker.controller;
+    }
+    if (registration.active) return registration.active;
+
+    const readyRegistration = await Promise.race([
+      navigator.serviceWorker.ready.catch(() => null),
+      new Promise((resolve) => window.setTimeout(() => resolve(null), 10000)),
+    ]);
+    return (
+      navigator.serviceWorker.controller ||
+      readyRegistration?.active ||
+      registration.active ||
+      null
+    );
+  }
+
+  async function cacheUrlWithServiceWorker(url) {
+    const worker = await getReadyPerformanceWorker();
+    if (!worker || typeof MessageChannel !== "function") return false;
+
+    return new Promise((resolve) => {
+      const channel = new MessageChannel();
+      let settled = false;
+      const finish = (success) => {
+        if (settled) return;
+        settled = true;
+        window.clearTimeout(timeout);
+        channel.port1.close();
+        resolve(Boolean(success));
+      };
+      const timeout = window.setTimeout(() => finish(false), 180000);
+      channel.port1.onmessage = (event) => finish(event.data?.ok === true);
+      channel.port1.onmessageerror = () => finish(false);
+
+      try {
+        worker.postMessage({ type: "CACHE_URL", url }, [channel.port2]);
+      } catch {
+        finish(false);
+      }
+    });
+  }
+
+  /**
+   * 只读取动作配置而不消费点击次数，用于判断某张照片接下来会请求哪首歌。
+   */
+  function getMusicActionForPrefetch(actionName, sequenceIndex) {
+    const hasConfiguredAction = Object.prototype.hasOwnProperty.call(
+      musicActions,
+      actionName,
+    );
+    let action = hasConfiguredAction ? musicActions[actionName] : MUSIC_NEXT;
+
+    if (!Array.isArray(action)) return action;
+    if (!action.length) return MUSIC_CONTINUE;
+
+    const suppliedIndex = Number(sequenceIndex);
+    const actionIndex = Number.isFinite(suppliedIndex)
+      ? Math.trunc(suppliedIndex)
+      : 0;
+    return action[positiveModulo(actionIndex, action.length)];
+  }
+
+  /**
+   * 在不改变当前播放状态的前提下解析一个待缓存动作。
+   * NEXT 会以传入的参考歌曲为基准，CONTINUE 则保持参考歌曲。
+   */
+  function resolveMusicCueForPrefetch(action, referenceTrackIndex = -1) {
+    const normalizedSymbol =
+      typeof action === "string" ? action.trim().toUpperCase() : "";
+    if (normalizedSymbol === MUSIC_CONTINUE) {
+      return referenceTrackIndex >= 0
+        ? resolveMusicCue(referenceTrackIndex)
+        : currentMusicCue;
+    }
+    if (normalizedSymbol === MUSIC_NEXT) {
+      return resolveMusicCue(
+        referenceTrackIndex >= 0 ? referenceTrackIndex + 1 : 0,
+      );
+    }
+
+    if (action && typeof action === "object" && !Array.isArray(action)) {
+      const referenceKey = ["track", "trackIndex", "index", "id", "title"].find(
+        (key) => Object.prototype.hasOwnProperty.call(action, key),
+      );
+      const referenceValue = referenceKey ? action[referenceKey] : null;
+      const objectSymbol =
+        typeof referenceValue === "string"
+          ? referenceValue.trim().toUpperCase()
+          : "";
+
+      if (objectSymbol === MUSIC_CONTINUE) {
+        return referenceTrackIndex >= 0
+          ? resolveMusicCue({ ...action, [referenceKey]: referenceTrackIndex })
+          : currentMusicCue;
+      }
+      if (objectSymbol === MUSIC_NEXT) {
+        return resolveMusicCue({
+          ...action,
+          [referenceKey]: referenceTrackIndex >= 0 ? referenceTrackIndex + 1 : 0,
+        });
+      }
+    }
+
+    return resolveMusicCue(action);
+  }
+
+  function appendUniqueMusicSource(target, seen, cue) {
+    if (!cue?.src) return;
+    const url = normalizeMediaUrl(cue.src);
+    if (!url || seen.has(url)) return;
+    seen.add(url);
+    target.push(cue.src);
+  }
+
+  /**
+   * 按真实故事流程组织首批优先级：爱心树、许愿、照片流最前面的几次点击。
+   * 照片后段和礼物阶段会在用户接近时再用滑动窗口预取，避免页面打开后
+   * 就把几十首照片歌曲全部放进后台队列。
+   */
+  function collectLikelyMusicSources(anchorCue = currentMusicCue) {
+    const sources = [];
+    const seen = new Set();
+    let referenceTrackIndex = Number.isFinite(anchorCue?.trackIndex)
+      ? anchorCue.trackIndex
+      : currentMusicTrackIndex;
+
+    const appendAction = (action) => {
+      const cue = resolveMusicCueForPrefetch(action, referenceTrackIndex);
+      if (!cue) return;
+      referenceTrackIndex = cue.trackIndex;
+      appendUniqueMusicSource(sources, seen, cue);
+    };
+
+    appendAction(getMusicActionForPrefetch("loveTreeHeart"));
+    appendAction(getMusicActionForPrefetch("wishButton"));
+
+    for (let index = 0; index < musicPhotoPreloadAhead; index += 1) {
+      appendAction(getMusicActionForPrefetch("photoCard", index));
+    }
+
+    return sources;
+  }
+
+  /**
+   * 鼠标移到照片或键盘聚焦照片时，只预取该照片点击后真正需要的音频。
+   */
+  function prefetchMusicForPhotoIndex(index) {
+    if (
+      !musicPlaylist.length ||
+      shouldSkipBackgroundPrefetch(musicSkipOnSaveData)
+    ) {
+      return;
+    }
+
+    const action = getMusicActionForPrefetch("photoCard", index);
+    const cue = resolveMusicCueForPrefetch(action, currentMusicTrackIndex);
+    if (cue?.src) {
+      queueMediaPrefetch([cue.src], "audio", { priority: true });
+    }
+  }
+
+  /**
+   * 根据照片点击顺序预取一个小型歌曲窗口。显式歌曲片段、NEXT 和 CONTINUE
+   * 都沿用正式播放时的解析规则，不会修改当前歌曲或消耗任何点击计数。
+   */
+  function prefetchPhotoMusicWindow(
+    startIndex,
+    count = musicPhotoPreloadAhead,
+  ) {
+    if (
+      !musicPlaylist.length ||
+      shouldSkipBackgroundPrefetch(musicSkipOnSaveData)
+    ) {
+      return;
+    }
+
+    const firstIndex = Math.max(0, Math.trunc(Number(startIndex) || 0));
+    const preloadCount = Math.round(
+      configuredNumber(count, musicPhotoPreloadAhead, 0),
+    );
+    if (!preloadCount) return;
+
+    const sources = [];
+    const seen = new Set();
+    let referenceTrackIndex = currentMusicTrackIndex;
+
+    for (let offset = 0; offset < preloadCount; offset += 1) {
+      const action = getMusicActionForPrefetch(
+        "photoCard",
+        firstIndex + offset,
+      );
+      const cue = resolveMusicCueForPrefetch(action, referenceTrackIndex);
+      if (!cue) continue;
+      referenceTrackIndex = cue.trackIndex;
+      appendUniqueMusicSource(sources, seen, cue);
+    }
+
+    if (sources.length) {
+      queueMediaPrefetch(sources, "audio", { priority: true });
+    }
+  }
+
+  /**
+   * 默认只缓存故事流程中马上可能播放的少量歌曲。只有显式开启
+   * cacheWholePlaylist 后，才会在带宽空闲时把整张歌单加入后台队列。
+   */
+  function scheduleMusicPreloading(anchorCue = currentMusicCue) {
+    window.clearTimeout(musicPreloadTimer);
+    window.clearTimeout(musicPreloadAllTimer);
+    musicPreloadTimer = 0;
+    musicPreloadAllTimer = 0;
+
+    if (
+      !musicPlaylist.length ||
+      shouldSkipBackgroundPrefetch(musicSkipOnSaveData)
+    ) {
+      return;
+    }
+
+    const currentUrl = normalizeMediaUrl(anchorCue?.src || "");
+    const likelySources = collectLikelyMusicSources(anchorCue);
+    const allSources = [];
+    const seen = new Set();
+    const appendSource = (source, allowCurrent = false) => {
+      const url = normalizeMediaUrl(source);
+      if (!url || seen.has(url) || (!allowCurrent && url === currentUrl)) return;
+      seen.add(url);
+      allSources.push(source);
+    };
+
+    likelySources.forEach((source) => appendSource(source));
+    if (musicCacheWholePlaylist) {
+      musicPlaylist.forEach((track) => appendSource(track.src));
+    }
+
+    const prioritySources = allSources.slice(0, musicPreloadAhead);
+    const remainingSources = musicCacheWholePlaylist
+      ? [
+          ...(anchorCue?.src ? [anchorCue.src] : []),
+          ...allSources.slice(prioritySources.length),
+        ]
+      : [];
+
+    if (prioritySources.length) {
+      musicPreloadTimer = window.setTimeout(() => {
+        musicPreloadTimer = 0;
+        queueMediaPrefetch(prioritySources, "audio", { priority: true });
+      }, musicPreloadDelayMs);
+    }
+
+    if (
+      musicCacheWholePlaylist &&
+      musicCacheRemainingAfterMs > 0 &&
+      remainingSources.length
+    ) {
+      musicPreloadAllTimer = window.setTimeout(() => {
+        musicPreloadAllTimer = 0;
+        queueMediaPrefetch(remainingSources, "audio");
+      }, musicPreloadDelayMs + musicCacheRemainingAfterMs);
+    }
   }
 
   /**
@@ -1353,6 +1937,8 @@
     if (source) {
       if (mediaType === "video") {
         const video = document.createElement("video");
+        const posterSource =
+          typeof photo.poster === "string" ? photo.poster.trim() : "";
         video.className = "photo-media photo-video";
         video.muted = photo.muted !== false;
         video.defaultMuted = video.muted;
@@ -1363,8 +1949,10 @@
           typeof photo.preload === "string" ? photo.preload : "metadata";
         video.disablePictureInPicture = true;
         video.setAttribute("aria-hidden", "true");
-        if (typeof photo.poster === "string" && photo.poster.trim()) {
-          video.poster = photo.poster.trim();
+        video.dataset.photoSrc = source;
+        if (posterSource) {
+          video.poster = posterSource;
+          frame.classList.add("has-media", "has-video", "has-poster");
         }
         if (typeof photo.fit === "string" && photo.fit.trim()) {
           video.style.objectFit = photo.fit.trim();
@@ -1380,12 +1968,22 @@
         video.addEventListener(
           "error",
           () => {
-            frame.classList.remove("has-media", "has-video");
+            if (posterSource) {
+              video.pause();
+              video.removeAttribute("src");
+              video.load();
+              frame.classList.add("has-media", "has-video", "has-poster");
+              return;
+            }
+            frame.classList.remove(
+              "has-media",
+              "has-video",
+              "has-poster",
+            );
             video.remove();
           },
           { once: true },
         );
-        video.src = source;
         frame.append(video);
 
         // 小标签提示这是一段会循环播放的视频，不遮挡画面主体。
@@ -1395,12 +1993,14 @@
         videoBadge.setAttribute("aria-hidden", "true");
         frame.append(videoBadge);
       } else {
+        const thumbnailSource = getPhotoThumbnailSource(photo);
         const image = document.createElement("img");
         image.className = "photo-media photo-image";
-        image.loading = "lazy";
+        image.loading = "eager";
         image.decoding = "async";
         image.draggable = false;
         image.alt = photo.alt || fallbackName;
+        image.dataset.photoSrc = thumbnailSource;
         if (typeof photo.fit === "string" && photo.fit.trim()) {
           image.style.objectFit = photo.fit.trim();
         }
@@ -1417,7 +2017,6 @@
           },
           { once: true },
         );
-        image.src = source;
         frame.append(image);
       }
     }
@@ -1427,7 +2026,14 @@
     bottomCaption.textContent =
       photo.bottom || "把这一刻，交给照片替我们记住。";
 
+    const warmCardResources = () => {
+      prefetchPhotoPreview(photo);
+      prefetchMusicForPhotoIndex(index);
+    };
+
     card.append(topCaption, frame, bottomCaption);
+    card.addEventListener("pointerenter", warmCardResources, { once: true });
+    card.addEventListener("focusin", warmCardResources, { once: true });
     card.addEventListener("click", () => {
       openPhotoLightbox(photo, index, card);
     });
@@ -1594,56 +2200,102 @@
 
     // photoCard 可配置为 NEXT、CONTINUE、单个片段或按照片序号排列的数组。
     triggerMusicAction("photoCard", index);
+    prefetchPhotoMusicWindow(index + 1);
 
-    const source = typeof photo.src === "string" ? photo.src.trim() : "";
-    const mediaType = getPhotoMediaType(photo, source);
+    const originalSource =
+      typeof photo.src === "string" ? photo.src.trim() : "";
+    const mediaType = getPhotoMediaType(photo, originalSource);
+    const lightboxSource =
+      mediaType === "video" ? originalSource : getPhotoPreviewSource(photo);
     lightboxReturnTarget = trigger;
     lightboxTopCaption.textContent =
       photo.top || "这里会放入一段温柔的小回忆。";
     lightboxBottomCaption.textContent =
       photo.bottom || "把这一刻，交给照片替我们记住。";
-    resetLightboxMedia();
-    lightboxPlaceholder.hidden = Boolean(source);
+    const mediaToken = resetLightboxMedia();
+    lightboxPlaceholder.hidden = false;
 
-    if (source && mediaType === "video") {
-      lightboxFrame.classList.add("has-media", "has-video");
+    if (lightboxSource && mediaType === "video") {
+      lightboxVideo.dataset.mediaToken = String(mediaToken);
       lightboxVideo.muted = true;
       lightboxVideo.defaultMuted = true;
       lightboxVideo.loop = photo.loop !== false;
       lightboxVideo.playsInline = true;
-      if (typeof photo.poster === "string" && photo.poster.trim()) {
-        lightboxVideo.poster = photo.poster.trim();
-      } else {
-        lightboxVideo.removeAttribute("poster");
+      const poster =
+        typeof photo.poster === "string" ? photo.poster.trim() : "";
+      if (poster) {
+        lightboxVideo.poster = poster;
+        lightboxFrame.classList.add("has-media", "has-video");
+        lightboxPlaceholder.hidden = true;
       }
-      lightboxVideo.src = source;
+      lightboxVideo.src = lightboxSource;
+      lightboxVideo.load();
       lightboxVideo.play().catch(() => {});
-    } else if (source) {
-      lightboxFrame.classList.add("has-media", "has-image");
+    } else if (lightboxSource) {
+      lightboxImage.dataset.mediaToken = String(mediaToken);
       lightboxImage.alt = photo.alt || `第 ${index + 1} 张生日照片`;
-      lightboxImage.src = source;
+      lightboxImage.src = lightboxSource;
     }
 
+    prefetchNeighborPhotoPreviews(index);
     photoTrack.classList.add("is-paused");
     photoLightbox.classList.add("is-visible");
     photoLightbox.setAttribute("aria-hidden", "false");
     document.body.classList.add("lightbox-open");
-    interactionStatus.textContent =
-      mediaType === "video"
-        ? "视频已经打开并循环播放，照片流暂时停下；关闭后会继续流动。"
-        : "照片已经放大，照片流暂时停下；关闭后会继续流动。";
+    interactionStatus.textContent = lightboxSource
+      ? mediaType === "video"
+        ? "视频正在加载，照片流暂时停下；关闭后会继续流动。"
+        : "照片正在加载，照片流暂时停下；关闭后会继续流动。"
+      : "这张回忆暂时没有配置照片或视频。";
     closePhotoLightboxButton.focus({ preventScroll: true });
+  }
+
+  function isCurrentLightboxMedia(media) {
+    return (
+      media instanceof HTMLElement &&
+      Number(media.dataset.mediaToken) === lightboxMediaToken
+    );
+  }
+
+  function handleLightboxImageLoad(event) {
+    if (!isCurrentLightboxMedia(event.currentTarget)) return;
+    lightboxFrame.classList.remove("has-video");
+    lightboxFrame.classList.add("has-media", "has-image");
+    lightboxPlaceholder.hidden = true;
+    interactionStatus.textContent =
+      "照片已经放大，照片流暂时停下；关闭后会继续流动。";
+  }
+
+  function handleLightboxVideoLoad(event) {
+    if (!isCurrentLightboxMedia(event.currentTarget)) return;
+    lightboxFrame.classList.remove("has-image");
+    lightboxFrame.classList.add("has-media", "has-video");
+    lightboxPlaceholder.hidden = true;
+    lightboxVideo.play().catch(() => {});
+    interactionStatus.textContent =
+      "视频已经打开并循环播放，照片流暂时停下；关闭后会继续流动。";
+  }
+
+  function handleLightboxMediaError(event) {
+    if (!isCurrentLightboxMedia(event.currentTarget)) return;
+    showLightboxPlaceholder();
+    interactionStatus.textContent =
+      "这项媒体暂时加载失败，请稍后重新打开。";
   }
 
   // 媒体加载失败或关闭弹层时，清理图片与视频，避免视频在后台继续发声或耗电。
   function resetLightboxMedia() {
+    const token = ++lightboxMediaToken;
     lightboxFrame.classList.remove("has-media", "has-image", "has-video");
+    delete lightboxImage.dataset.mediaToken;
     lightboxImage.removeAttribute("src");
     lightboxImage.alt = "";
+    delete lightboxVideo.dataset.mediaToken;
     lightboxVideo.pause();
     lightboxVideo.removeAttribute("src");
     lightboxVideo.removeAttribute("poster");
     lightboxVideo.load();
+    return token;
   }
 
   function showLightboxPlaceholder() {
@@ -1948,6 +2600,7 @@
         updateMusicButton(false);
       }
     });
+    scheduleMusicPreloading(openingMusicCue);
   }
 
   function installOpeningMusicRetry() {
@@ -2641,6 +3294,7 @@
     setCurrentMusicCue(normalizedCue);
     startMusicMonitor();
     updateMusicButton(true);
+    scheduleMusicPreloading(normalizedCue);
     return normalizedCue;
   }
 

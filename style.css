@@ -441,6 +441,23 @@ body[data-phase="opening-caught"] {
   animation: blink 800ms steps(1, end) infinite;
 }
 
+.clock-heading {
+  /* 字体 */
+  font-family: "STKaiti", "KaiTi", serif;
+
+  /* 字号 */
+  font-size: clamp(16px, 2.55vw, 28px);
+
+  /* 字重 */
+  font-weight: 600;
+
+  /* 每个字之间的距离 */
+  letter-spacing: 0.08em;
+
+  /* 文字行高 */
+  line-height: 1.4;
+}
+
 .clock-box {
   position: absolute;
   top: 80.88%;
@@ -463,13 +480,48 @@ body[data-phase="opening-caught"] {
 }
 
 #clock {
+  /* 标题与计时文字之间的上下距离 */
+  margin-top: 4px;
+
+  /* 整行计时文字向右偏移量 */
   margin-left: 7%;
+
   white-space: nowrap;
+
+  /* “第、天、小时、分钟、秒”的字体 */
+  font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+
+  /* “第、天、小时、分钟、秒”的字号 */
   font-size: clamp(8px, 1.45vw, 16px);
+
+  /* 普通文字的字符间距 */
+  letter-spacing: 0.04em;
+
+  /* 有空格位置的间距 */
+  word-spacing: 0.08em;
+
+  line-height: 1.2;
 }
 
 #clock .digit {
+  display: inline-block;
+
+  /* 数字字体 */
+  font-family: Georgia, "Times New Roman", serif;
+
+  /* 数字字号 */
   font-size: clamp(22px, 5.82vw, 64px);
+
+  /* 数字粗细 */
+  font-weight: 600;
+
+  /* 数字自身字符间距 */
+  letter-spacing: 0.02em;
+
+  /* 数字与“第、天、小时”等文字之间的距离 */
+  margin-inline: 0.04em;
+
+  /* 保持每个数字宽度一致，避免计时跳动 */
   font-variant-numeric: tabular-nums;
 }
 
@@ -666,15 +718,20 @@ body[data-phase="opening-caught"] {
     line-height: 1.72;
   }
 
-  .clock-box {
-    font-size: clamp(9px, 2.8vw, 14px);
+  .clock-heading {
+    font-size: clamp(11px, 2.8vw, 14px);
+    letter-spacing: 0.06em;
   }
 
   #clock {
+    margin-top: 2px;
     font-size: clamp(6px, 1.85vw, 9px);
+    letter-spacing: 0.02em;
+    word-spacing: 0.03em;
   }
 
   #clock .digit {
+    margin-inline: 0.025em;
     font-size: clamp(15px, 5.7vw, 29px);
   }
 }
@@ -743,7 +800,7 @@ body[data-phase="opening-caught"] {
 }
 
 .intro-guide.is-visible {
-  right: 1.6%;
+  right: -16%;  /* 爱心树米老鼠往右侧移动，数字越小越靠右，0是中立，负数更右 -2% */
 }
 
 .mouse-mascot {
@@ -775,7 +832,7 @@ body[data-phase="opening-caught"] {
 .speech-bubble {
   position: relative;
   align-self: center;
-  width: min(285px, 30vw);
+  /* width: min(285px, 30vw); */
   margin-bottom: 15%;
   padding: clamp(14px, 2vw, 24px);
   border: 1px solid rgba(198, 93, 98, 0.18);

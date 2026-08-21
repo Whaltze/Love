@@ -6,13 +6,20 @@
    - `03.jpg`
    - ……
 2. 打开项目根目录的 `birthday-content.js`。
-3. 找到对应照片，把 `src: ""` 改成：
+3. 同时生成一张照片流缩略图和一张点击放大预览图，分别放入：
+   - `assets/media/thumbs/`
+   - `assets/media/previews/`
+4. 找到对应照片，填写三个路径：
 
    ```js
    src: "./photos/01.jpg",
+   thumbnail: "./assets/media/thumbs/photo-01.jpg",
+   preview: "./assets/media/previews/photo-01.jpg",
    ```
 
-4. `top` 是素材上方的短句，`bottom` 是素材下方的说明，`alt` 用来描述内容。
+5. `top` 是素材上方的短句，`bottom` 是素材下方的说明，`alt` 用来描述内容。
+
+`thumbnail` 用于照片流，`preview` 只在点击放大时加载，`src` 保留原图。缺少前两项时网页会回退到原图，但异地访问会明显更慢。
 
 支持常见的 `.jpg`、`.jpeg`、`.png`、`.webp`、`.gif` 图片。GIF 会像普通照片一样加入照片流，并自动播放自身动画。
 
@@ -22,7 +29,7 @@ MP4 / WebM 视频也可以加入，并在照片墙内静音、循环播放：
 {
   src: "./photos/memory-video.mp4",
   type: "video",
-  poster: "./photos/memory-video-cover.jpg", // 可选封面
+  poster: "./assets/media/thumbs/memory-video-cover.jpg", // 建议使用轻量封面
   autoplay: true,
   loop: true,
   muted: true,
