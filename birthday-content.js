@@ -849,6 +849,9 @@ window.BIRTHDAY_CONTENT = {
       top: "不必费力追逐浪漫，你本身 便是 醉美 风景！",
       bottom: "陪伴是最长情的告白，余生，只想与你相伴"
     },
+
+
+
     {
       src: "./photos/photos (4).jpg",
       thumbnail: "./assets/media/thumbs/photo-02.jpg",
@@ -857,7 +860,14 @@ window.BIRTHDAY_CONTENT = {
       top: "再忙碌的日子，也要记得给一日三餐留一点温柔的余地",
       bottom: "好好照顾那个  我曾在意过无数遍的你。"
     },
-
+    {
+      src: "./photos/2.jpg",
+      thumbnail: "./assets/media/thumbs/photo-09.jpg",
+      preview: "./assets/media/previews/photo-09.jpg",
+      alt: "",
+      top: "今晚月色真美。",
+      bottom: "风也温柔，我很想你"
+    },
     {
       src: "./photos/photos (8).jpg",
       thumbnail: "./assets/media/thumbs/photo-03.jpg",
@@ -907,14 +917,14 @@ window.BIRTHDAY_CONTENT = {
       top: "把平凡细碎的朝夕，珍藏进我们的回忆",
       bottom: "蓦然回首，身旁始终是你"
     },
-    {
-      src: "./photos/2.jpg",
-      thumbnail: "./assets/media/thumbs/photo-09.jpg",
-      preview: "./assets/media/previews/photo-09.jpg",
-      alt: "",
-      top: "今晚月色真美。",
-      bottom: "风也温柔，我很想你"
-    },
+    // {
+    //   src: "./photos/2.jpg",
+    //   thumbnail: "./assets/media/thumbs/photo-09.jpg",
+    //   preview: "./assets/media/previews/photo-09.jpg",
+    //   alt: "",
+    //   top: "今晚月色真美。",
+    //   bottom: "风也温柔，我很想你"
+    // },
     {
       src: "./photos/photos (2).jpg",
       thumbnail: "./assets/media/thumbs/photo-10.jpg",
