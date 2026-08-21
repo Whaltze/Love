@@ -479,7 +479,7 @@ window.BIRTHDAY_CONTENT = {
 
         { //  "莫文蔚 - 慢慢喜欢你"
           track: "slowly-fall-for-you",
-          start: "00:00",
+          start: "01:14",
           end: "03:13",
         },
         // 13. G.E.M.邓紫棋 - 句号
@@ -582,7 +582,7 @@ window.BIRTHDAY_CONTENT = {
    */
   story: {
     // 打字机每个汉字出现的间隔。越小越快；建议范围：35～110。
-    characterDelayMs: 120,
+    characterDelayMs: 130,
 
     // 文字全部显示完后，米老鼠再等待多久出现。
     invitationDelayMs: 600,
@@ -621,7 +621,7 @@ window.BIRTHDAY_CONTENT = {
     photoContinueButtonMs: 1800,
 
     // 照片场景自动播放多久后，米老鼠带礼物出现。
-    photoDurationMs: 16000,
+    photoDurationMs: 48000,
 
     // 点击“签收礼物”后，礼物盒等待多久自动打开。
     giftOpenDelayMs: 720,
@@ -1033,7 +1033,7 @@ window.BIRTHDAY_CONTENT = {
    */
   card: {
     eyebrow: "FOR MY DEAREST",
-    title: "生日快乐 我的朋友",
+    title: "曼嘉 生日快乐",
     lines: [
       "愿你新的一岁，眼里有光，心里有梦",
       "愿所有小小的期待，都在某一天悄悄抵达",
