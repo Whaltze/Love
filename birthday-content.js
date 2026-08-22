@@ -1003,14 +1003,7 @@ window.BIRTHDAY_CONTENT = {
     //   top: "今晚月色真美。",
     //   bottom: "风也温柔，我很想你"
     // },
-    {
-      src: "./photos/photos (2).jpg",
-      thumbnail: "./assets/media/thumbs/photo-10.jpg",
-      preview: "./assets/media/previews/photo-10.jpg",
-      alt: "",
-      top: "一起走过的路，连风景都有了特别的名字",
-      bottom: "下一站、下下一站，也想继续陪你抵达"
-    },
+
     {
       src: "./photos/肖像大头照.jpg",
       thumbnail: "./assets/media/thumbs/photo-14.jpg",
@@ -1018,6 +1011,15 @@ window.BIRTHDAY_CONTENT = {
       alt: "",
       top: "有你分享的快乐，总会在心里停留得更久。",
       bottom: "把今天的愿望，交给明天慢慢实现。"
+    },
+
+    {
+      src: "./photos/photos (2).jpg",
+      thumbnail: "./assets/media/thumbs/photo-10.jpg",
+      preview: "./assets/media/previews/photo-10.jpg",
+      alt: "",
+      top: "一起走过的路，连风景都有了特别的名字",
+      bottom: "下一站、下下一站，也想继续陪你抵达"
     },
     {
       src: "./photos/photos (11).jpg",
