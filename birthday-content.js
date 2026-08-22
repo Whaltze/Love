@@ -359,6 +359,13 @@ window.BIRTHDAY_CONTENT = {
         start: "00:45",
         end: null,
       },
+      {
+        id: "happy birthday",
+        title: "happy birthday",
+        src: "./assets/audio/optimized/happy birthday.mp3",
+        start: null,
+        end: null,
+      },
     ],
 
     actions: {
@@ -378,6 +385,17 @@ window.BIRTHDAY_CONTENT = {
       // 点击照片流中的任意照片、打开照片大图时触发。
       // photoCard: "NEXT",
       photoCard: [
+        { // Sweety - 樱花草
+          track: "sakura-grass",
+          start: "02:38",
+          end: "04:30",
+        },
+        // 3. 金玟岐 - 岁月神偷
+        {
+          track: "thief-of-time",
+          start: "00:47",
+          end: null,
+        },
 
         { // "方大同 - 特别的人
           track: "special-person",
@@ -391,11 +409,7 @@ window.BIRTHDAY_CONTENT = {
         //   end: "03:13",
         // },
 
-        { // Sweety - 樱花草
-          track: "sakura-grass",
-          start: "02:38",
-          end: "04:30",
-        },
+
 
          // 1. 阿肆, 郭采洁 - 世界上的另一个我
         {
@@ -411,12 +425,7 @@ window.BIRTHDAY_CONTENT = {
           end: null,
         },
 
-        // 3. 金玟岐 - 岁月神偷
-        {
-          track: "thief-of-time",
-          start: "00:47",
-          end: null,
-        },
+
 
         // 4. 莫文蔚 - 这世界那么多人
         {
@@ -441,24 +450,26 @@ window.BIRTHDAY_CONTENT = {
 
 
 
+        // 18. Walk off the Earth - Summer Vibe
+        {
+          track: "summer-vibe",
+          start: "00:45",
+          end: null,
+        },
+
+
+
+        // 12. G.E.M.邓紫棋 - 多远都要在一起
+        {
+          track: "together-no-matter-how-far",
+          start: "00:48",
+          end: null,
+        },
+
         // 8. 许嵩 - 有何不可
         {
           track: "what-can-not",
           start: "00:22",
-          end: null,
-        },
-
-        // 9. 于果 - 侧脸
-        {
-          track: "side-face",
-          start: "00:40",
-          end: null,
-        },
-
-        // 10. 张杰 - 他不懂
-        {
-          track: "he-doesnt-understand",
-          start: "00:44",
           end: null,
         },
 
@@ -469,12 +480,13 @@ window.BIRTHDAY_CONTENT = {
           end: null,
         },
 
-        // 12. G.E.M.邓紫棋 - 多远都要在一起
+        // 9. 于果 - 侧脸
         {
-          track: "together-no-matter-how-far",
-          start: "00:48",
+          track: "side-face",
+          start: "00:40",
           end: null,
         },
+
 
         { //  "莫文蔚 - 慢慢喜欢你"
           track: "slowly-fall-for-you",
@@ -482,12 +494,14 @@ window.BIRTHDAY_CONTENT = {
           end: "03:13",
         },
 
+
         // 7. 萧潇 - 爱要坦荡荡
         {
           track: "love-be-frank",
           start: "00:15",
           end: null,
         },
+
 
         // 14. Ina Wroldsen - I wanted you
         {
@@ -516,13 +530,12 @@ window.BIRTHDAY_CONTENT = {
           start: "00:14",
           end: null,
         },
-
-        // 18. Walk off the Earth - Summer Vibe
         {
-          track: "summer-vibe",
-          start: "00:45",
-          end: null,
+          track: "happy birthday",
+          start: null,
+          end: "00:28",
         },
+
       ],
 
       // 【关闭照片大图】
@@ -1096,7 +1109,16 @@ window.BIRTHDAY_CONTENT = {
       alt: "",
       top: "往后山河远阔不必独行，我会伴你沿途共赏人间花香。",
       bottom: "愿日子热烈丰盈，世间所有美好热忱，我们一同共享。"
-    }
+    },
+
+    {
+      src: "./photos/photos (20).jpg",
+      thumbnail: "./assets/media/thumbs/photo-20.jpg",
+      preview: "./assets/media/previews/photo-20.jpg",
+      alt: "",
+      top: "二十岁，新序开启，生日快乐！",
+      bottom: "继续热烈，继续闪闪发光！"
+    },
   ],
 
 
