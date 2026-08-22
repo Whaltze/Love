@@ -493,7 +493,7 @@ window.BIRTHDAY_CONTENT = {
           start: "01:14",
           end: "03:13",
         },
-        
+
         // 15. Ivy Adara - Famous
         {
           track: "famous",
@@ -1023,8 +1023,8 @@ window.BIRTHDAY_CONTENT = {
       thumbnail: "./assets/media/thumbs/photo-14.jpg",
       preview: "./assets/media/previews/photo-14.jpg",
       alt: "",
-      top: "有你分享的快乐，总会在心里停留得更久。",
-      bottom: "把今天的愿望，交给明天慢慢实现。"
+      top: "有你分享的快乐，总会在心里停留得更久",
+      bottom: "把今天的愿望，交给明天慢慢实现"
     },
 
     {
