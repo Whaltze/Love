@@ -493,7 +493,13 @@ window.BIRTHDAY_CONTENT = {
           start: "01:14",
           end: "03:13",
         },
-
+        
+        // 15. Ivy Adara - Famous
+        {
+          track: "famous",
+          start: "00:00",
+          end: null,
+        },
 
         // 7. 萧潇 - 爱要坦荡荡
         {
@@ -510,12 +516,7 @@ window.BIRTHDAY_CONTENT = {
           end: null,
         },
 
-        // 15. Ivy Adara - Famous
-        {
-          track: "famous",
-          start: "00:00",
-          end: null,
-        },
+
 
         // 16. Lenka - Lucky
         {
@@ -1067,13 +1068,22 @@ window.BIRTHDAY_CONTENT = {
       bottom: "风也温柔，我很想你"
     },
 
+    {
+      src: "./photos/photos (12).jpg",
+      thumbnail: "./assets/media/thumbs/photo-17.jpg",
+      preview: "./assets/media/previews/photo-17.jpg",
+      alt: "",
+      top: "见过无数蓝天美景，唯独对你满心牵挂",
+      bottom: "愿往后所有的美好，都奔赴向你而来"
+    },
+
     {  //     top: "走过四季的更迭，才懂得最美的诗句就在眼前。",
   //     bottom: "岁岁年年，万喜万般宜，只要始终是你。"
       src: "./photos/photos (6).jpg",
       thumbnail: "./assets/media/thumbs/photo-15.jpg",
       preview: "./assets/media/previews/photo-15.jpg",
       alt: "",
-      top: "四季更迭，饱览最美诗篇。",
+      top: "四季更迭，饱览最美诗篇",
       bottom: "岁岁年年，只要是你，始终是你"
     },
     {
@@ -1084,14 +1094,7 @@ window.BIRTHDAY_CONTENT = {
       top: "光落在脸上的时候，时间也变得很温柔。",
       bottom: "愿往后的每一次快门，都有我们的笑容。"
     },
-    {
-      src: "./photos/photos (12).jpg",
-      thumbnail: "./assets/media/thumbs/photo-17.jpg",
-      preview: "./assets/media/previews/photo-17.jpg",
-      alt: "",
-      top: "见过无数蓝天美景，唯独对你满心牵挂",
-      bottom: "愿往后所有的美好，都奔赴向你而来"
-    },
+
 
     {
       src: "./photos/portrait-full.jpg",
