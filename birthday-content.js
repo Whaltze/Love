@@ -953,6 +953,15 @@ window.BIRTHDAY_CONTENT = {
       top: "风吹过裙摆的刹那，定格了季节的轻盈",
       bottom: "故事还长，我们慢慢讲给岁月听"
     },
+
+    {
+      src: "./photos/photos (14).jpg",
+      thumbnail: "./assets/media/thumbs/photo-05.jpg",
+      preview: "./assets/media/previews/photo-05.jpg",
+      alt: "",
+      top: "何其有幸与你相伴一程，往后人间风月，我们一同览尽。",
+      bottom: "前路漫漫岁岁安然，陪你永远清澈，永远热烈勇敢鲜活。"
+    },
     {
       src: "./photos/mv1.mp4",
       type: "video",
@@ -961,14 +970,6 @@ window.BIRTHDAY_CONTENT = {
       alt: "",
       top: "第一次把平凡的日子，认真地收进记忆里",
       bottom: "原来幸福就是，回头时 你一直都在"
-    },
-    {
-      src: "./photos/photos (14).jpg",
-      thumbnail: "./assets/media/thumbs/photo-05.jpg",
-      preview: "./assets/media/previews/photo-05.jpg",
-      alt: "",
-      top: "何其有幸与你相伴一程，往后人间风月，我们一同览尽。",
-      bottom: "前路漫漫岁岁安然，陪你永远清澈，永远热烈勇敢鲜活。"
     },
     {
       src: "./photos/photos9.jpg",
