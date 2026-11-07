@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>404 - 网站离家出走了</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f7f9fc;
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            color: #4a4a4a;
+        }
+        h1 {
+            font-size: 3rem;
+            color: #ff6b6b;
+            margin-bottom: 10px;
+        }
+        p {
+            font-size: 1.2rem;
+            margin-bottom: 30px;
+        }
+        img {
+            max-width: 300px;
+            border-radius: 20px;
+            /* box-shadow: 0 10px 20px rgba(0,0,0,0.1); */
+        }
+        .footer-text {
+            font-size: 0.9rem;
+            color: #a0a0a0;
+            margin-top: 30px;
+        }
+    </style>
+</head>
+<body>
+    <h1>( •́ .̫ •̀ ) 404</h1>
+    <p>地球太危险，本网站已经打包行李离家出走了...</p>
+    
+    <!-- 建议在本地放一张可爱的图替换 src，或者直接用这张测试图 -->
+    <!-- <img src="https://http.cat/404" alt="离家出走"> -->
+    <img src="./cat.png" alt="离家出走">
+    <div class="footer-text">站长正在全宇宙搜寻它的下落，归期未定</div>
+    <script>
+        // Refresh the old birthday worker when the entry page is switched.
+        if ("serviceWorker" in navigator && window.isSecureContext) {
+            navigator.serviceWorker.register("./sw.js", {
+                scope: "./",
+                updateViaCache: "none"
+            }).catch(function () {});
+        }
+    </script>
+</body>
+</html>

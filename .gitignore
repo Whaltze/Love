@@ -1,0 +1,26 @@
+# Windows / macOS 系统文件
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# 编辑器本地配置
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# 临时文件与日志
+*.log
+*.tmp
+*.temp
+*.bak
+~$*
+
+# 如果以后临时安装前端依赖，不把依赖目录推送到仓库
+node_modules/
+
+SOURCE/
+
+# Local switch backups and lock (keep mode templates in Git)
+.site-modes/backups/
+.site-modes/switch.lock
