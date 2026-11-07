@@ -21,7 +21,7 @@ node_modules/
 
 SOURCE/
 
-# Local switch backups and lock (keep mode templates in Git)
+# Local switch backups and lock
 .site-modes/backups/
 .site-modes/switch.lock
 
@@ -31,3 +31,34 @@ SOURCE/
 一键恢复生日.bat
 一键切换404.bat
 一键推送.bat
+
+# 本地工具、说明和模式备份不参与网页发布
+/*.md
+/*.bat
+/scripts/
+/.site-modes/
+
+# 高清原图留在本地；网页照片使用 assets/media 下的公开版本
+/photos/*
+!/photos/mv1.mp4
+
+# 原始音频不发布，只保留网页正在使用的压缩音频
+/assets/audio/*
+!/assets/audio/optimized/
+/assets/audio/optimized/dear-you-1.mp3
+
+# 下架素材和未使用的图片
+/assets/media/previews/*下架*
+/assets/media/thumbs/*下架*
+/assets/headwear-transparent.png
+/1cat.png
+
+# 本地凭据和个人资料
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+/private/
+/.private/

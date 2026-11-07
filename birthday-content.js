@@ -770,16 +770,16 @@ window.BIRTHDAY_CONTENT = {
    * --------------------------------------------------------------------------
    *
    * 如何继续添加很多张照片：
-   * 1. 把原图复制到 photos 文件夹。
+   * 1. 把原图保存到 SOURCE 文件夹（仅本地，不上传 GitHub）。
    * 2. 另外生成一张小缩略图和一张中等尺寸预览图，分别放进
    *    assets/media/thumbs 与 assets/media/previews，避免异地访问直接下载大原图。
    * 3. 复制下面任意一个完整的 { ... } 照片对象。
    * 4. 粘贴到 photos 数组末尾，确保前一个对象结尾保留逗号。
-   * 5. 修改 src、thumbnail、preview、alt、top、bottom；视频可设置 type、poster、loop。
+   * 5. 图片 src 与 preview 都使用公开预览图路径；视频使用允许上传的路径，其他参数按需修改。
    *
    * 示例：
    * {
-   *   src: "./photos/photo-07.jpg",                 // 原图，只作为保留接口
+   *   src: "./assets/media/previews/photo-07.jpg",  // 公开预览图，原图留在本地
    *   thumbnail: "./assets/media/thumbs/photo-07.jpg", // 照片流小图
    *   preview: "./assets/media/previews/photo-07.jpg", // 点击放大时加载
    *   alt: "第七张生日回忆照片",
@@ -806,141 +806,9 @@ window.BIRTHDAY_CONTENT = {
    * 如果暂时没有图片，把 src 留空字符串 ""，网页会自动显示占位卡片。
    * 图片、动图和视频数量无需在其他文件登记，JavaScript 会自动扩展并保持无缝流动。
    */
-  // photos: [
-  //  {
-  //     src: "./photos/photos (10).jpg",
-  //     alt: "",
-  //     top: "不用刻意寻找浪漫，你站着的地方就是风景。",
-  //     bottom: "陪伴是最长情的告白，而你在就是最好的答案。"
-  //   },
-  //   {
-  //     src: "./photos/photos (5).jpg",
-  //     alt: "",
-  //     top: "在奔走于各自未来的日子里，请照顾好那个努力的自己。",
-  //     bottom: "愿你的每一次伏案，都能换来星光璀璨的明天。"
-  //   },
-
-  //   {
-  //     src: "./photos/2.jpg",
-  //     alt: "",
-  //     top: "风吹过裙摆的刹那，定格了整个季节的轻盈。",
-  //     bottom: "故事还长，这漫漫半生我们慢慢讲给岁月听。"
-  //   },
-
-  //   {
-  //     src: "./photos/photos (8).jpg",
-  //     alt: "",
-  //     top: "以后没有我碎碎念的岁月，你要学会自己给自己拥抱。",
-  //     bottom: "请把所有的热爱与期待，都毫无保留地留给自己。"
-  //   },
-  //   {
-  //     src: "./photos/mv1.mp4",
-  //     alt: "",
-  //     top: "再忙碌的日子，也要记得给一日三餐留一点温柔的余地。",
-  //     bottom: "替我好好照顾那个，我曾在意过无数遍的你。"
-  //   },
-  //   {
-  //     src: "./photos/photos (14).jpg",
-  //     alt: "",
-  //     top: "谢谢你曾陪我走过一程，接下来的风景你要替我去赏。",
-  //     bottom: "岁岁安好，前路漫长，愿你一生清澈，一生勇敢。"
-  //   },
-  //   {
-  //     src: "./photos/photos9.jpg",
-  //     alt: "",
-  //     top: "烛光跃动在你的眼眸，像是藏着一万个星系。",
-  //     bottom: "许下的每一个心愿，我都想为你保驾护航。"
-  //   },
-  //   {
-  //     src: "./photos/photos (16).jpg",
-  //     alt: "",
-  //     top: "有你分享的快乐，总会在心里停留得更久。",
-  //     bottom: "把今天的愿望，交给明天慢慢实现。"
-  //   },
-  //   {
-  //     src: "./photos/photos (9).jpg",
-  //     alt: "",
-  //     top: "第一次把平凡的日子，认真地收进记忆里。",
-  //     bottom: "原来幸福，就是回头时你一直都在。"
-  //   },
-  //   {
-  //   src: "./photos/photos (2).jpg",
-  //   alt: "",
-  //   top: "一起走过的路，连风景都有了特别的名字。",
-  //   bottom: "下一站、下下一站，也想继续陪你抵达。"
-  //   },
-  //   {
-  //     src: "./photos/photos (11).jpg",
-  //     alt: "",
-  //     top: "照片会褪色，但被爱着的感觉不会。",
-  //     bottom: "愿新的一岁，仍有花、星光和好多好多爱。"
-  //   },
-  //   {
-  //     src: "./photos/photos (7).jpg",
-  //     alt: "",
-  //     top: "那些没有准备的瞬间，后来都成了珍藏。",
-  //     bottom: "爱把普通的一天，变成值得纪念的一天。"
-  //   },
-  //   {
-  //     src: "./photos/photos (4).jpg",
-  //     alt: "",
-  //     top: "书页里翻过的不仅是岁月，还有你不断生长的灵魂。",
-  //     bottom: "保持对世界的好奇，你终将成为自己的太阳。"
-  //   },
-  //   {
-  //     src: "./photos/肖像大头照.jpg",
-  //     alt: "",
-  //     top: "每一个崭新的清晨，都是为了迎接更好的你而存在。",
-  //     bottom: "把遗憾留在昨天，去拥抱那个无限可能的未来。"
-  //   },
-
-  //   {
-  //     src: "./photos/photos (6).jpg",
-  //     alt: "",
-  //     top: "走过四季的更迭，才懂得最美的诗句就在眼前。",
-  //     bottom: "岁岁年年，万喜万般宜，只要始终是你。"
-  //   },
-  //   {
-  //     src: "./photos/photos (1).jpg",
-  //     alt: "",
-  //     top: "光落在脸上的时候，时间也变得很温柔。",
-  //     bottom: "愿往后的每一次快门，都有我们的笑容。"
-  //   },
-  //   {
-  //     src: "./photos/photos (12).jpg",
-  //     alt: "",
-  //     top: "万水千山的旅程，愿你踏出的每一步都坚定且从容。",
-  //     bottom: "在我看不见的远方，请你务必熠熠生辉。"
-  //   },
-  //   {
-  //     src: "./photos/portrait-full.jpg",
-  //     alt: "",
-  //     top: "偶尔觉得孤单也没关系，那是你在独自长大的声音。",
-  //     bottom: "愿你拥有披荆斩棘的勇气，也有安然入梦的宁静。"
-  //   },
-
-  //   {
-  //     src: "./photos/photos (13).jpg",
-  //     alt: "",
-  //     top: "故事的分岔路口，我的缺席并不妨碍你的耀眼。",
-  //     bottom: "带着我的祝愿向前走吧，不要回头，要向着光。"
-  //   },
-
-
-  //   {
-  //     src: "./photos/photos (15).jpg",
-  //     alt: "",
-  //     top: "哪怕以后的路要一个人走，也要记得留意沿途的花香。",
-  //     bottom: "愿你把日子过得丰盈，连同我的那一份热忱。"
-  //   }
-
-
-
-  // ],
-
   photos: [
     {
-      src: "./photos/photos (10).jpg",
+      src: "./assets/media/previews/photo-01.jpg",
       thumbnail: "./assets/media/thumbs/photo-01.jpg",
       preview: "./assets/media/previews/photo-01.jpg",
       alt: "",
@@ -951,7 +819,7 @@ window.BIRTHDAY_CONTENT = {
 
 
     {
-      src: "./photos/photos (4).jpg",
+      src: "./assets/media/previews/photo-02.jpg",
       thumbnail: "./assets/media/thumbs/photo-02.jpg",
       preview: "./assets/media/previews/photo-02.jpg",
       alt: "",
@@ -960,7 +828,7 @@ window.BIRTHDAY_CONTENT = {
     },
 
     {
-      src: "./photos/photos (8).jpg",
+      src: "./assets/media/previews/photo-03.jpg",
       thumbnail: "./assets/media/thumbs/photo-03.jpg",
       preview: "./assets/media/previews/photo-03.jpg",
       alt: "",
@@ -969,7 +837,7 @@ window.BIRTHDAY_CONTENT = {
     },
 
     {
-      src: "./photos/photos (14).jpg",
+      src: "./assets/media/previews/photo-05.jpg",
       thumbnail: "./assets/media/thumbs/photo-05.jpg",
       preview: "./assets/media/previews/photo-05.jpg",
       alt: "",
@@ -986,7 +854,7 @@ window.BIRTHDAY_CONTENT = {
       bottom: "原来幸福就是，回头时 你一直都在"
     },
     {
-      src: "./photos/photos9.jpg",
+      src: "./assets/media/previews/photo-06.jpg",
       thumbnail: "./assets/media/thumbs/photo-06.jpg",
       preview: "./assets/media/previews/photo-06.jpg",
       alt: "",
@@ -994,7 +862,7 @@ window.BIRTHDAY_CONTENT = {
       bottom: "你许下的每一个愿望，我都愿倾尽温柔实现"
     },
     {
-      src: "./photos/photos (16).jpg",
+      src: "./assets/media/previews/photo-07.jpg",
       thumbnail: "./assets/media/thumbs/photo-07.jpg",
       preview: "./assets/media/previews/photo-07.jpg",
       alt: "",
@@ -1002,7 +870,7 @@ window.BIRTHDAY_CONTENT = {
       bottom: "美好期许，慢慢兑现"
     },
     {
-      src: "./photos/photos (9).jpg",
+      src: "./assets/media/previews/photo-08.jpg",
       thumbnail: "./assets/media/thumbs/photo-08.jpg",
       preview: "./assets/media/previews/photo-08.jpg",
       alt: "",
@@ -1019,7 +887,7 @@ window.BIRTHDAY_CONTENT = {
     // },
 
     {
-      src: "./photos/肖像大头照.jpg",
+      src: "./assets/media/previews/photo-14.jpg",
       thumbnail: "./assets/media/thumbs/photo-14.jpg",
       preview: "./assets/media/previews/photo-14.jpg",
       alt: "",
@@ -1028,7 +896,7 @@ window.BIRTHDAY_CONTENT = {
     },
 
     {
-      src: "./photos/photos (2).jpg",
+      src: "./assets/media/previews/photo-10.jpg",
       thumbnail: "./assets/media/thumbs/photo-10.jpg",
       preview: "./assets/media/previews/photo-10.jpg",
       alt: "",
@@ -1036,7 +904,7 @@ window.BIRTHDAY_CONTENT = {
       bottom: "下一站、下下一站，也想继续陪你抵达"
     },
     {
-      src: "./photos/photos (11).jpg",
+      src: "./assets/media/previews/photo-11.jpg",
       thumbnail: "./assets/media/thumbs/photo-11.jpg",
       preview: "./assets/media/previews/photo-11.jpg",
       alt: "",
@@ -1044,7 +912,7 @@ window.BIRTHDAY_CONTENT = {
       bottom: "愿新的一岁，仍有花、星光和好多好多爱"
     },
     {
-      src: "./photos/photos (7).jpg",
+      src: "./assets/media/previews/photo-12.jpg",
       thumbnail: "./assets/media/thumbs/photo-12.jpg",
       preview: "./assets/media/previews/photo-12.jpg",
       alt: "",
@@ -1052,7 +920,7 @@ window.BIRTHDAY_CONTENT = {
       bottom: "爱把普通的一天，变成值得纪念的一天"
     },
     {
-      src: "./photos/photos (5).jpg",
+      src: "./assets/media/previews/photo-13.jpg",
       thumbnail: "./assets/media/thumbs/photo-13.jpg",
       preview: "./assets/media/previews/photo-13.jpg",
       alt: "",
@@ -1060,7 +928,7 @@ window.BIRTHDAY_CONTENT = {
       bottom: "永远保有对世界的热忱好奇，活成自己的太阳。"
     },
     {
-      src: "./photos/2.jpg",
+      src: "./assets/media/previews/photo-09.jpg",
       thumbnail: "./assets/media/thumbs/photo-09.jpg",
       preview: "./assets/media/previews/photo-09.jpg",
       alt: "",
@@ -1069,7 +937,7 @@ window.BIRTHDAY_CONTENT = {
     },
 
     {
-      src: "./photos/photos (12).jpg",
+      src: "./assets/media/previews/photo-17.jpg",
       thumbnail: "./assets/media/thumbs/photo-17.jpg",
       preview: "./assets/media/previews/photo-17.jpg",
       alt: "",
@@ -1079,7 +947,7 @@ window.BIRTHDAY_CONTENT = {
 
     {  //     top: "走过四季的更迭，才懂得最美的诗句就在眼前。",
   //     bottom: "岁岁年年，万喜万般宜，只要始终是你。"
-      src: "./photos/photos (6).jpg",
+      src: "./assets/media/previews/photo-15.jpg",
       thumbnail: "./assets/media/thumbs/photo-15.jpg",
       preview: "./assets/media/previews/photo-15.jpg",
       alt: "",
@@ -1087,7 +955,7 @@ window.BIRTHDAY_CONTENT = {
       bottom: "岁岁年年，只要是你，始终是你"
     },
     {
-      src: "./photos/photos (1).jpg",
+      src: "./assets/media/previews/photo-16.jpg",
       thumbnail: "./assets/media/thumbs/photo-16.jpg",
       preview: "./assets/media/previews/photo-16.jpg",
       alt: "",
@@ -1097,7 +965,7 @@ window.BIRTHDAY_CONTENT = {
 
 
     {
-      src: "./photos/portrait-full.jpg",
+      src: "./assets/media/previews/photo-18.jpg",
       thumbnail: "./assets/media/thumbs/photo-18.jpg",
       preview: "./assets/media/previews/photo-18.jpg",
       alt: "",
@@ -1106,7 +974,7 @@ window.BIRTHDAY_CONTENT = {
     },
 
     {
-      src: "./photos/photos (15).jpg",
+      src: "./assets/media/previews/photo-19.jpg",
       thumbnail: "./assets/media/thumbs/photo-19.jpg",
       preview: "./assets/media/previews/photo-19.jpg",
       alt: "",
@@ -1115,7 +983,7 @@ window.BIRTHDAY_CONTENT = {
     },
 
     {
-      src: "./photos/photos (20).jpg",
+      src: "./assets/media/previews/photo-20.jpg",
       thumbnail: "./assets/media/thumbs/photo-20.jpg",
       preview: "./assets/media/previews/photo-20.jpg",
       alt: "",
